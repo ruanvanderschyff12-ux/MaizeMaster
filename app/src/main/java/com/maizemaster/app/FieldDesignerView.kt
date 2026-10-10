@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.view.View
 
 class FieldDesignerView(context: Context) : View(context) {
@@ -28,6 +29,12 @@ class FieldDesignerView(context: Context) : View(context) {
             invalidate()
         }
 
+    var fieldShape = "Rectangle"
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
@@ -37,31 +44,53 @@ class FieldDesignerView(context: Context) : View(context) {
 
         if (availableWidth <= 0 || availableHeight <= 0) return
 
+        val shapeWidth = if (fieldShape == "Circle") {
+            minOf(fieldWidth, fieldLength)
+        } else fieldWidth
+
+        val shapeLength = if (fieldShape == "Circle") {
+            shapeWidth
+        } else fieldLength
+
         val scale = minOf(
-            availableWidth / fieldWidth,
-            availableHeight / fieldLength
+            availableWidth / shapeWidth,
+            availableHeight / shapeLength
         )
 
-        val drawWidth = fieldWidth * scale
-        val drawHeight = fieldLength * scale
+        val drawWidth = shapeWidth * scale
+        val drawHeight = shapeLength * scale
 
         val left = (width - drawWidth) / 2f
         val top = (height - drawHeight) / 2f
 
-        paint.color = Color.rgb(115, 77, 38)
-        paint.style = Paint.Style.FILL
+        val path = Path()
 
-        canvas.drawRect(
-            left, top,
-            left + drawWidth,
-            top + drawHeight,
-            paint
-        )
+        when (fieldShape) {
+            "Oval", "Circle" -> path.addOval(
+                left, top,
+                left + drawWidth,
+                top + drawHeight,
+                Path.Direction.CW
+            )
+            else -> path.addRect(
+                left, top,
+                left + drawWidth,
+                top + drawHeight,
+                Path.Direction.CW
+            )
+        }
+
+        paint.style = Paint.Style.FILL
+        paint.color = Color.rgb(115, 77, 38)
+        canvas.drawPath(path, paint)
+
+        canvas.save()
+        canvas.clipPath(path)
 
         paint.color = Color.rgb(55, 145, 55)
-        paint.strokeWidth = 2f
+        paint.strokeWidth = 3f
 
-        val rowCount = (fieldWidth / rowSpacing)
+        val rowCount = (shapeWidth / rowSpacing)
             .toInt().coerceAtMost(500)
 
         for (i in 1 until rowCount) {
@@ -74,17 +103,12 @@ class FieldDesignerView(context: Context) : View(context) {
             )
         }
 
+        canvas.restore()
+
         paint.color = Color.BLACK
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4f
-
-        canvas.drawRect(
-            left, top,
-            left + drawWidth,
-            top + drawHeight,
-            paint
-        )
-
+        canvas.drawPath(path, paint)
         paint.style = Paint.Style.FILL
     }
 }
