@@ -2,10 +2,8 @@ package com.maizemaster.app
 
 import android.app.Activity
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.*
+import android.view.ViewGroup
 
 class MainActivity : Activity() {
 
@@ -14,7 +12,7 @@ class MainActivity : Activity() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 60, 40, 40)
+            setPadding(30, 30, 30, 30)
         }
 
         val title = TextView(this).apply {
@@ -22,41 +20,76 @@ class MainActivity : Activity() {
             textSize = 28f
         }
 
-        val hectares = EditText(this).apply {
-            hint = "Field size in hectares"
+        val fieldView = FieldDesignerView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                500
+            )
+        }
+
+        val widthInput = EditText(this).apply {
+            hint = "Field width (meters)"
             inputType = 8194
         }
 
-        val yield = EditText(this).apply {
-            hint = "Expected tons per hectare"
+        val lengthInput = EditText(this).apply {
+            hint = "Field length (meters)"
+            inputType = 8194
+        }
+
+        val spacingInput = EditText(this).apply {
+            hint = "Row spacing (meters)"
             inputType = 8194
         }
 
         val result = TextView(this).apply {
-            text = "Your estimated harvest will appear here"
-            textSize = 20f
+            textSize = 18f
+            text = "Enter your field measurements"
         }
 
-        val calculate = Button(this).apply {
-            text = "Calculate Harvest"
-            setOnClickListener {
-                val area = hectares.text.toString()
-                    .toDoubleOrNull() ?: 0.0
-                val tons = yield.text.toString()
-                    .toDoubleOrNull() ?: 0.0
+        val button = Button(this).apply {
+            text = "Update Field"
 
-                result.text =
-                    "Estimated harvest: %.2f tons"
-                        .format(area * tons)
+            setOnClickListener {
+                val w = widthInput.text.toString()
+                    .toFloatOrNull()
+
+                val l = lengthInput.text.toString()
+                    .toFloatOrNull()
+
+                val s = spacingInput.text.toString()
+                    .toFloatOrNull()
+
+                if (w == null || l == null || s == null ||
+                    !w.isFinite() || !l.isFinite() ||
+                    !s.isFinite() || w <= 0f || l <= 0f ||
+                    s <= 0f
+                ) {
+                    result.text = "Enter valid positive measurements"
+                } else {
+                    fieldView.fieldWidth = w
+                    fieldView.fieldLength = l
+                    fieldView.rowSpacing = s
+
+                    val hectares = w * l / 10000.0
+
+                    result.text =
+                        "Field size: %.2f hectares"
+                            .format(hectares)
+                }
             }
         }
 
         layout.addView(title)
-        layout.addView(hectares)
-        layout.addView(yield)
-        layout.addView(calculate)
+        layout.addView(fieldView)
+        layout.addView(widthInput)
+        layout.addView(lengthInput)
+        layout.addView(spacingInput)
+        layout.addView(button)
         layout.addView(result)
 
-        setContentView(layout)
+        val scroll = ScrollView(this)
+        scroll.addView(layout)
+        setContentView(scroll)
     }
 }
