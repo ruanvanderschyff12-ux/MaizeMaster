@@ -1,4 +1,3 @@
-
 package com.maizemaster.app
 
 import android.content.Context
@@ -14,10 +13,8 @@ class FieldStorage(context: Context) {
 
     fun loadFields(): MutableList<SavedField> {
         val fields = mutableListOf<SavedField>()
-
         val savedJson = preferences.getString(
-            "saved_fields",
-            "[]"
+            "saved_fields", "[]"
         ) ?: "[]"
 
         try {
@@ -42,6 +39,21 @@ class FieldStorage(context: Context) {
                         ),
                         harvestedTons = item.optDouble(
                             "harvestedTons", 0.0
+                        ),
+                        plantingDate = item.optString(
+                            "plantingDate", ""
+                        ),
+                        maturityDays = item.optInt(
+                            "maturityDays", 0
+                        ),
+                        growthStage = item.optString(
+                            "growthStage", ""
+                        ),
+                        growthNotes = item.optString(
+                            "growthNotes", ""
+                        ),
+                        growthObservedDate = item.optString(
+                            "growthObservedDate", ""
                         )
                     )
                 )
@@ -71,14 +83,13 @@ class FieldStorage(context: Context) {
                 put("plantSpacing", field.plantSpacing)
                 put("maizeVariety", field.maizeVariety)
                 put("expectedYield", field.expectedYield)
-                put(
-                    "harvestedHectares",
-                    field.harvestedHectares
-                )
-                put(
-                    "harvestedTons",
-                    field.harvestedTons
-                )
+                put("harvestedHectares", field.harvestedHectares)
+                put("harvestedTons", field.harvestedTons)
+                put("plantingDate", field.plantingDate)
+                put("maturityDays", field.maturityDays)
+                put("growthStage", field.growthStage)
+                put("growthNotes", field.growthNotes)
+                put("growthObservedDate", field.growthObservedDate)
             }
 
             array.put(item)
@@ -97,7 +108,6 @@ class FieldStorage(context: Context) {
 
     fun updateField(updatedField: SavedField): Boolean {
         val fields = loadFields()
-
         val index = fields.indexOfFirst {
             it.id == updatedField.id
         }
@@ -110,7 +120,6 @@ class FieldStorage(context: Context) {
 
     fun deleteField(fieldId: String): Boolean {
         val fields = loadFields()
-
         val removed = fields.removeAll {
             it.id == fieldId
         }
