@@ -4,9 +4,11 @@ package com.maizemaster.app
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Shader
 import android.view.View
 import kotlin.math.ceil
 import kotlin.math.max
@@ -40,20 +42,89 @@ class FieldDesignerView(context: Context) : View(context) {
             invalidate()
         }
 
+    private fun drawMaizePlant(
+        canvas: Canvas,
+        x: Float,
+        y: Float,
+        size: Float
+    ) {
+        val darkGreen = Color.rgb(23, 103, 35)
+        val mediumGreen = Color.rgb(45, 151, 50)
+        val lightGreen = Color.rgb(133, 205, 68)
+
+        for (i in 0 until 8) {
+            canvas.save()
+            canvas.rotate(i * 45f, x, y)
+
+            val leaf = Path().apply {
+                moveTo(x, y)
+                cubicTo(
+                    x - size * 0.35f,
+                    y - size * 0.25f,
+                    x - size * 0.28f,
+                    y - size * 0.75f,
+                    x,
+                    y - size
+                )
+                cubicTo(
+                    x + size * 0.28f,
+                    y - size * 0.75f,
+                    x + size * 0.35f,
+                    y - size * 0.25f,
+                    x,
+                    y
+                )
+                close()
+            }
+
+            paint.style = Paint.Style.FILL
+            paint.color =
+                if (i % 2 == 0) mediumGreen else darkGreen
+            canvas.drawPath(leaf, paint)
+
+            paint.style = Paint.Style.STROKE
+            paint.color = lightGreen
+            paint.strokeWidth = max(0.5f, size * 0.07f)
+            canvas.drawLine(
+                x, y,
+                x, y - size * 0.85f,
+                paint
+            )
+
+            canvas.restore()
+        }
+
+        paint.style = Paint.Style.FILL
+        paint.color = lightGreen
+        canvas.drawCircle(
+            x, y,
+            max(0.7f, size * 0.15f),
+            paint
+        )
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
         val margin = 24f
-        val availableWidth = width - margin * 2
-        val availableHeight = height - margin * 2
+        val availableWidth = width - margin * 2f
+        val availableHeight = height - margin * 2f
 
-        if (availableWidth <= 0 || availableHeight <= 0) return
+        if (availableWidth <= 0f ||
+            availableHeight <= 0f
+        ) return
 
         val w = fieldWidth.coerceAtLeast(1f)
-        val h = if (fieldShape == "Circle") w
-                else fieldLength.coerceAtLeast(1f)
+        val h = if (fieldShape == "Circle") {
+            w
+        } else {
+            fieldLength.coerceAtLeast(1f)
+        }
 
-        val scale = min(availableWidth / w, availableHeight / h)
+        val scale = min(
+            availableWidth / w,
+            availableHeight / h
+        )
 
         val drawWidth = w * scale
         val drawHeight = h * scale
@@ -62,75 +133,98 @@ class FieldDesignerView(context: Context) : View(context) {
         val top = (height - drawHeight) / 2f
 
         val bounds = RectF(
-            left, top,
+            left,
+            top,
             left + drawWidth,
             top + drawHeight
         )
 
         val fieldPath = Path().apply {
-            if (fieldShape == "Oval" || fieldShape == "Circle") {
+            if (fieldShape == "Oval" ||
+                fieldShape == "Circle"
+            ) {
                 addOval(bounds, Path.Direction.CW)
             } else {
                 addRect(bounds, Path.Direction.CW)
             }
         }
 
-        // Draw soil background
+        // Brown soil background
         paint.style = Paint.Style.FILL
-        paint.color = Color.rgb(126, 91, 57)
+        paint.shader = LinearGradient(
+            left,
+            top,
+            left + drawWidth,
+            top + drawHeight,
+            Color.rgb(105, 68, 38),
+            Color.rgb(154, 107, 64),
+            Shader.TileMode.CLAMP
+        )
         canvas.drawPath(fieldPath, paint)
+        paint.shader = null
 
         canvas.save()
         canvas.clipPath(fieldPath)
 
-        // Draw visible representative maize rows
+        // Representative rows, scaled for visibility
         val actualRows = w / rowSpacing
-        val displayRows = min(18, max(2, ceil(actualRows).toInt()))
+        val displayRows = min(
+            16,
+            max(2, ceil(actualRows).toInt())
+        )
 
         val rowGap = drawWidth / displayRows
+
+        val plantCount = min(
+            26,
+            max(2, (drawHeight / 14f).toInt())
+        )
+
+        val plantGap = drawHeight / plantCount
 
         for (i in 0 until displayRows) {
             val x = left + (i + 0.5f) * rowGap
 
-            // Planting row
-            paint.color = Color.rgb(65, 115, 42)
-            paint.strokeWidth = max(2f, rowGap * 0.22f)
             paint.style = Paint.Style.STROKE
+            paint.color = Color.rgb(75, 48, 28)
+            paint.strokeWidth = max(
+                1.5f,
+                rowGap * 0.18f
+            )
 
-            canvas.drawLine(x, top, x, top + drawHeight, paint)
-
-            // Individual maize plants
-            paint.style = Paint.Style.FILL
-
-            val plantCount = min(
-                35,
-                max(2, (drawHeight / 12f).toInt())
+            canvas.drawLine(
+                x, top,
+                x, top + drawHeight,
+                paint
             )
 
             for (j in 0 until plantCount) {
-                val y = top + (j + 0.5f) *
-                    drawHeight / plantCount
+                val y = top + (j + 0.5f) * plantGap
 
-                val radius = min(5f, rowGap * 0.32f)
-
-                paint.color = Color.rgb(105, 205, 65)
-                canvas.drawCircle(x, y, radius, paint)
-
-                paint.color = Color.rgb(38, 125, 35)
-                canvas.drawCircle(
-                    x - radius * 0.3f,
-                    y - radius * 0.3f,
-                    radius * 0.45f,
-                    paint
+                val plantSize = min(
+                    12f,
+                    min(
+                        rowGap * 0.42f,
+                        plantGap * 0.48f
+                    )
                 )
+
+                if (plantSize > 0.5f) {
+                    drawMaizePlant(
+                        canvas,
+                        x,
+                        y,
+                        plantSize
+                    )
+                }
             }
         }
 
         canvas.restore()
 
         // Field border
-        paint.color = Color.rgb(35, 75, 30)
         paint.style = Paint.Style.STROKE
+        paint.color = Color.rgb(26, 89, 43)
         paint.strokeWidth = 4f
         canvas.drawPath(fieldPath, paint)
 
