@@ -2,6 +2,7 @@
 package com.maizemaster.app
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -17,30 +18,90 @@ import kotlin.math.min
 class FieldDesignerView(context: Context) : View(context) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var cachedBitmap: Bitmap? = null
+    private var needsRedraw = true
 
     var fieldWidth = 200f
         set(value) {
-            field = value.coerceAtLeast(1f)
-            invalidate()
+            val newValue = value.coerceAtLeast(1f)
+            if (field != newValue) {
+                field = newValue
+                refreshField()
+            }
         }
 
     var fieldLength = 300f
         set(value) {
-            field = value.coerceAtLeast(1f)
-            invalidate()
+            val newValue = value.coerceAtLeast(1f)
+            if (field != newValue) {
+                field = newValue
+                refreshField()
+            }
         }
 
     var rowSpacing = 0.75f
         set(value) {
-            field = value.coerceAtLeast(0.1f)
-            invalidate()
+            val newValue = value.coerceAtLeast(0.1f)
+            if (field != newValue) {
+                field = newValue
+                refreshField()
+            }
         }
 
     var fieldShape = "Rectangle"
         set(value) {
-            field = value
-            invalidate()
+            if (field != value) {
+                field = value
+                refreshField()
+            }
         }
+
+    private fun refreshField() {
+        needsRedraw = true
+        invalidate()
+    }
+
+    override fun onSizeChanged(
+        w: Int,
+        h: Int,
+        oldw: Int,
+        oldh: Int
+    ) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        needsRedraw = true
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+
+        if (width <= 0 || height <= 0) return
+
+        if (needsRedraw ||
+            cachedBitmap?.width != width ||
+            cachedBitmap?.height != height
+        ) {
+            cachedBitmap?.recycle()
+
+            cachedBitmap = Bitmap.createBitmap(
+                width,
+                height,
+                Bitmap.Config.ARGB_8888
+            )
+
+            cachedBitmap?.let {
+                drawField(Canvas(it))
+            }
+
+            needsRedraw = false
+        }
+
+        cachedBitmap?.let {
+            paint.style = Paint.Style.FILL
+            paint.shader = null
+            paint.color = Color.WHITE
+            canvas.drawBitmap(it, 0f, 0f, paint)
+        }
+    }
 
     private fun drawMaizePlant(
         canvas: Canvas,
@@ -80,14 +141,21 @@ class FieldDesignerView(context: Context) : View(context) {
             paint.style = Paint.Style.FILL
             paint.color =
                 if (i % 2 == 0) mediumGreen else darkGreen
+
             canvas.drawPath(leaf, paint)
 
             paint.style = Paint.Style.STROKE
             paint.color = lightGreen
-            paint.strokeWidth = max(0.5f, size * 0.07f)
+            paint.strokeWidth = max(
+                0.5f,
+                size * 0.07f
+            )
+
             canvas.drawLine(
-                x, y,
-                x, y - size * 0.85f,
+                x,
+                y,
+                x,
+                y - size * 0.85f,
                 paint
             )
 
@@ -97,15 +165,14 @@ class FieldDesignerView(context: Context) : View(context) {
         paint.style = Paint.Style.FILL
         paint.color = lightGreen
         canvas.drawCircle(
-            x, y,
+            x,
+            y,
             max(0.7f, size * 0.15f),
             paint
         )
     }
 
-    override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-
+    private fun drawField(canvas: Canvas) {
         val margin = 24f
         val availableWidth = width - margin * 2f
         val availableHeight = height - margin * 2f
@@ -149,7 +216,6 @@ class FieldDesignerView(context: Context) : View(context) {
             }
         }
 
-        // Brown soil background
         paint.style = Paint.Style.FILL
         paint.shader = LinearGradient(
             left,
@@ -160,14 +226,15 @@ class FieldDesignerView(context: Context) : View(context) {
             Color.rgb(154, 107, 64),
             Shader.TileMode.CLAMP
         )
+
         canvas.drawPath(fieldPath, paint)
         paint.shader = null
 
         canvas.save()
         canvas.clipPath(fieldPath)
 
-        // Representative rows, scaled for visibility
         val actualRows = w / rowSpacing
+
         val displayRows = min(
             16,
             max(2, ceil(actualRows).toInt())
@@ -193,8 +260,10 @@ class FieldDesignerView(context: Context) : View(context) {
             )
 
             canvas.drawLine(
-                x, top,
-                x, top + drawHeight,
+                x,
+                top,
+                x,
+                top + drawHeight,
                 paint
             )
 
@@ -222,12 +291,19 @@ class FieldDesignerView(context: Context) : View(context) {
 
         canvas.restore()
 
-        // Field border
         paint.style = Paint.Style.STROKE
         paint.color = Color.rgb(26, 89, 43)
         paint.strokeWidth = 4f
         canvas.drawPath(fieldPath, paint)
 
         paint.style = Paint.Style.FILL
+        paint.shader = null
+    }
+
+    override fun onDetachedFromWindow() {
+        cachedBitmap?.recycle()
+        cachedBitmap = null
+        needsRedraw = true
+        super.onDetachedFromWindow()
     }
 }
