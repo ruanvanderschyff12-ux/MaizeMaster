@@ -16,7 +16,10 @@ class MainActivity : Activity() {
     private val lightGreen = Color.rgb(232, 245, 233)
     private val backgroundColor = Color.rgb(246, 249, 245)
 
-    private fun rounded(color: Int, radius: Float = 22f): GradientDrawable {
+    private fun rounded(
+        color: Int,
+        radius: Float = 22f
+    ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = radius
@@ -31,7 +34,7 @@ class MainActivity : Activity() {
 
         val scroll = ScrollView(this).apply {
             setBackgroundColor(backgroundColor)
-            fillViewport = true
+            isFillViewport = true
         }
 
         val layout = LinearLayout(this).apply {
@@ -39,7 +42,10 @@ class MainActivity : Activity() {
             setPadding(24, 24, 24, 40)
         }
 
-        fun title(textValue: String, size: Float = 20f): TextView {
+        fun title(
+            textValue: String,
+            size: Float = 20f
+        ): TextView {
             return TextView(this).apply {
                 text = textValue
                 textSize = size
@@ -57,6 +63,7 @@ class MainActivity : Activity() {
                 setSingleLine(true)
                 setPadding(22, 18, 22, 18)
                 background = rounded(Color.WHITE, 18f)
+
                 val params = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -71,6 +78,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(20, 20, 20, 20)
                 background = rounded(lightGreen)
+
                 val params = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -79,6 +87,8 @@ class MainActivity : Activity() {
                 layoutParams = params
             }
         }
+
+        // MAIN HEADER
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -101,10 +111,17 @@ class MainActivity : Activity() {
 
         layout.addView(header)
 
-        val fieldSection = section()
-        fieldSection.addView(title("🌱 My Maize Field"))
+        // FIELD DESIGNER
 
-        val shapes = arrayOf("Rectangle", "Oval", "Circle")
+        val fieldSection = section()
+        fieldSection.addView(title("🌽 My Maize Field"))
+
+        val shapes = arrayOf(
+            "Rectangle",
+            "Oval",
+            "Circle"
+        )
+
         val shapeSelector = Spinner(this).apply {
             adapter = ArrayAdapter(
                 this@MainActivity,
@@ -112,6 +129,7 @@ class MainActivity : Activity() {
                 shapes
             )
         }
+
         fieldSection.addView(shapeSelector)
 
         val fieldView = FieldDesignerView(this).apply {
@@ -120,6 +138,7 @@ class MainActivity : Activity() {
                 500
             )
         }
+
         fieldSection.addView(fieldView)
 
         val widthInput = input("Field width (metres)")
@@ -129,6 +148,8 @@ class MainActivity : Activity() {
         fieldSection.addView(lengthInput)
 
         layout.addView(fieldSection)
+
+        // PLANTING DETAILS
 
         val plantingSection = section()
         plantingSection.addView(title("🚜 Planting Details"))
@@ -148,12 +169,15 @@ class MainActivity : Activity() {
                 arrayOf("White maize", "Yellow maize")
             )
         }
+
         plantingSection.addView(maizeSelector)
 
         val yieldInput = input("Expected tons per hectare")
         plantingSection.addView(yieldInput)
 
         layout.addView(plantingSection)
+
+        // HARVEST RESULTS
 
         val resultSection = section()
         resultSection.addView(title("📊 Harvest Estimate"))
@@ -173,8 +197,11 @@ class MainActivity : Activity() {
             setPadding(12, 18, 12, 18)
         }
 
+        // FIELD SHAPE SELECTION
+
         shapeSelector.onItemSelectedListener =
             object : AdapterView.OnItemSelectedListener {
+
                 override fun onItemSelected(
                     parent: AdapterView<*>?,
                     view: View?,
@@ -182,39 +209,68 @@ class MainActivity : Activity() {
                     id: Long
                 ) {
                     val shape = shapes[position]
+
                     fieldView.fieldShape = shape
                     fieldView.invalidate()
+
                     lengthInput.visibility =
                         if (shape == "Circle") View.GONE
                         else View.VISIBLE
                 }
 
-                override fun onNothingSelected(parent: AdapterView<*>?) {}
+                override fun onNothingSelected(
+                    parent: AdapterView<*>?
+                ) {}
             }
 
+        // HARVEST CALCULATOR
+
         calculateButton.setOnClickListener {
+
             val shape = shapeSelector.selectedItem.toString()
+
             val w = widthInput.text.toString().toDoubleOrNull()
+
             val l = if (shape == "Circle") w
                 else lengthInput.text.toString().toDoubleOrNull()
-            val row = rowInput.text.toString().toDoubleOrNull()
-            val plant = plantInput.text.toString().toDoubleOrNull()
-            val yieldRate = yieldInput.text.toString().toDoubleOrNull()
 
-            if (w == null || l == null || row == null ||
-                plant == null || yieldRate == null ||
-                !w.isFinite() || !l.isFinite() ||
-                !row.isFinite() || !plant.isFinite() ||
+            val row = rowInput.text.toString().toDoubleOrNull()
+
+            val plant = plantInput.text.toString().toDoubleOrNull()
+
+            val yieldRate =
+                yieldInput.text.toString().toDoubleOrNull()
+
+            if (
+                w == null ||
+                l == null ||
+                row == null ||
+                plant == null ||
+                yieldRate == null ||
+                !w.isFinite() ||
+                !l.isFinite() ||
+                !row.isFinite() ||
+                !plant.isFinite() ||
                 !yieldRate.isFinite() ||
-                w <= 0 || l <= 0 || row <= 0 ||
-                plant <= 0 || yieldRate < 0
+                w <= 0 ||
+                l <= 0 ||
+                row <= 0 ||
+                plant <= 0 ||
+                yieldRate < 0
             ) {
                 result.text = "Please enter valid measurements."
             } else {
+
                 val hectares =
-                    HarvestCalculator.calculateHectares(w, l, shape)
+                    HarvestCalculator.calculateHectares(
+                        w, l, shape
+                    )
+
                 val tons =
-                    HarvestCalculator.estimateTons(hectares, yieldRate)
+                    HarvestCalculator.estimateTons(
+                        hectares, yieldRate
+                    )
+
                 val plants =
                     HarvestCalculator.estimatePlants(
                         hectares, row, plant
@@ -234,12 +290,17 @@ class MainActivity : Activity() {
                     🌱 Plant positions: %,d
 
                     🚜 Estimated harvest: %.2f tons
-                """.trimIndent().format(hectares, plants, tons)
+                """.trimIndent().format(
+                    hectares,
+                    plants,
+                    tons
+                )
             }
         }
 
         resultSection.addView(calculateButton)
         resultSection.addView(result)
+
         layout.addView(resultSection)
 
         scroll.addView(layout)
