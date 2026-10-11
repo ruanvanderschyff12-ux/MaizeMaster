@@ -1,0 +1,1 @@
+Maize growth stage illustrations.
