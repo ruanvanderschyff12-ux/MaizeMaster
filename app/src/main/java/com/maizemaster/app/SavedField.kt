@@ -1,4 +1,3 @@
-
 package com.maizemaster.app
 
 data class SavedField(
@@ -12,7 +11,12 @@ data class SavedField(
     var maizeVariety: String,
     var expectedYield: Double,
     var harvestedHectares: Double = 0.0,
-    var harvestedTons: Double = 0.0
+    var harvestedTons: Double = 0.0,
+    var plantingDate: String = "",
+    var maturityDays: Int = 0,
+    var growthStage: String = "",
+    var growthNotes: String = "",
+    var growthObservedDate: String = ""
 ) {
     fun hectares(): Double {
         return HarvestCalculator.calculateHectares(
@@ -36,11 +40,9 @@ data class SavedField(
 
     fun harvestProgress(): Double {
         val total = hectares()
-
         if (total <= 0.0) return 0.0
 
-        return (
-            harvestedHectares / total * 100.0
-        ).coerceIn(0.0, 100.0)
+        return (harvestedHectares / total * 100.0)
+            .coerceIn(0.0, 100.0)
     }
 }
