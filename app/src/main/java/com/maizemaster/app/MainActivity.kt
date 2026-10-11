@@ -3,6 +3,7 @@ package com.maizemaster.app
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
@@ -20,6 +21,7 @@ class MainActivity : Activity() {
     private val backgroundColor = Color.rgb(246, 249, 245)
 
     private lateinit var storage: FieldStorage
+    private lateinit var refreshList: () -> Unit
     private var editingId: String? = null
 
     private fun rounded(
@@ -151,6 +153,23 @@ class MainActivity : Activity() {
 
         layout.addView(header)
 
+        // NEW WEATHER BUTTON
+
+        val weatherButton = button(
+            "🌦️ FIELD WEATHER FORECAST"
+        )
+
+        weatherButton.setOnClickListener {
+            startActivity(
+                Intent(
+                    this,
+                    WeatherActivity::class.java
+                )
+            )
+        }
+
+        layout.addView(weatherButton)
+
         // FIELD DESIGNER
 
         val fieldSection = section()
@@ -225,7 +244,7 @@ class MainActivity : Activity() {
 
         layout.addView(plantingSection)
 
-        // RESULTS
+        // HARVEST ESTIMATE
 
         val resultSection = section()
         resultSection.addView(title("📊 Harvest Estimate"))
@@ -243,7 +262,7 @@ class MainActivity : Activity() {
 
         layout.addView(resultSection)
 
-        // SAVE AND EDIT
+        // FIELD MANAGEMENT
 
         val saveSection = section()
         saveSection.addView(title("💾 Field Management"))
@@ -304,7 +323,7 @@ class MainActivity : Activity() {
                 ) {}
             }
 
-        // VALIDATE AND READ INPUTS
+        // READ FIELD INPUTS
 
         fun readField(id: String): SavedField? {
             val name = nameInput.text.toString().trim()
@@ -373,7 +392,7 @@ class MainActivity : Activity() {
             )
         }
 
-        // CALCULATE AND UPDATE DRAWING
+        // CALCULATE HARVEST
 
         fun showCalculation(field: SavedField) {
             val hectares = field.hectares()
@@ -406,7 +425,7 @@ class MainActivity : Activity() {
             )
         }
 
-        // OPEN A SAVED FIELD FOR EDITING
+        // OPEN SAVED FIELD
 
         fun openField(field: SavedField) {
             editingId = field.id
@@ -435,7 +454,7 @@ class MainActivity : Activity() {
             scroll.smoothScrollTo(0, 0)
         }
 
-        // HARVEST PROGRESS DIALOG
+        // RECORD HARVEST
 
         fun recordHarvest(field: SavedField) {
             val dialogLayout = LinearLayout(this).apply {
@@ -520,10 +539,8 @@ class MainActivity : Activity() {
             dialog.show()
         }
 
-        // SAVED FIELD LIST
+        // REFRESH SAVED FIELDS
 
-        // Refresh function is assigned below so it can
-        // also be called after saving harvest data.
         refreshList = {
             fieldList.removeAllViews()
 
@@ -586,23 +603,49 @@ class MainActivity : Activity() {
 
                 card.addView(progress)
 
+                // EDIT
+
                 val editButton = button("EDIT FIELD")
                 editButton.setOnClickListener {
                     openField(field)
                 }
                 card.addView(editButton)
 
+                // WEATHER FOR THIS FIELD
+
+                val fieldWeatherButton = button(
+                    "🌦️ CHECK FIELD WEATHER"
+                )
+
+                fieldWeatherButton.setOnClickListener {
+                    startActivity(
+                        Intent(
+                            this,
+                            WeatherActivity::class.java
+                        ).putExtra("field_id", field.id)
+                    )
+                }
+
+                card.addView(fieldWeatherButton)
+
+                // HARVEST
+
                 val harvestButton = button(
                     "RECORD HARVEST"
                 )
+
                 harvestButton.setOnClickListener {
                     recordHarvest(field)
                 }
+
                 card.addView(harvestButton)
+
+                // DUPLICATE
 
                 val duplicateButton = button(
                     "DUPLICATE FIELD"
                 )
+
                 duplicateButton.setOnClickListener {
                     val copy = field.copy(
                         id = UUID.randomUUID().toString(),
@@ -621,11 +664,15 @@ class MainActivity : Activity() {
                         ).show()
                     }
                 }
+
                 card.addView(duplicateButton)
+
+                // DELETE
 
                 val deleteButton = button(
                     "DELETE FIELD"
                 )
+
                 deleteButton.setOnClickListener {
                     AlertDialog.Builder(this)
                         .setTitle("Delete field?")
@@ -639,6 +686,7 @@ class MainActivity : Activity() {
                                     editingLabel.text =
                                         "Creating a new field"
                                 }
+
                                 refreshList()
                             } else {
                                 Toast.makeText(
@@ -651,8 +699,8 @@ class MainActivity : Activity() {
                         .setNegativeButton("CANCEL", null)
                         .show()
                 }
-                card.addView(deleteButton)
 
+                card.addView(deleteButton)
                 fieldList.addView(card)
             }
         }
@@ -754,7 +802,7 @@ class MainActivity : Activity() {
             }
         }
 
-        // NEW FIELD / CLEAR
+        // CLEAR / NEW FIELD
 
         newButton.setOnClickListener {
             editingId = null
@@ -788,6 +836,4 @@ class MainActivity : Activity() {
 
         refreshList()
     }
-
-    private lateinit var refreshList: () -> Unit
 }
