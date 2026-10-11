@@ -1,4 +1,3 @@
-
 package com.maizemaster.app
 
 import android.app.Activity
@@ -11,18 +10,19 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
-import android.view.ViewGroup
 import android.widget.*
 import java.util.Locale
 import java.util.UUID
 
 class MainActivity : Activity() {
+
     private val forest = Color.rgb(21, 83, 48)
     private val green = Color.rgb(38, 125, 69)
     private val pale = Color.rgb(234, 245, 235)
     private val page = Color.rgb(247, 249, 246)
     private val ink = Color.rgb(35, 56, 43)
     private val muted = Color.rgb(103, 121, 108)
+
     private lateinit var storage: FieldStorage
     private lateinit var refreshList: () -> Unit
     private var editingId: String? = null
@@ -30,11 +30,13 @@ class MainActivity : Activity() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density + 0.5f).toInt()
 
-    private fun bg(color: Int, radius: Int = 18): GradientDrawable =
-        GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-        }
+    private fun bg(
+        color: Int,
+        radius: Int = 18
+    ): GradientDrawable = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
+    }
 
     private fun text(
         value: String,
@@ -72,10 +74,12 @@ class MainActivity : Activity() {
         numeric: Boolean = true
     ): EditText = EditText(this).apply {
         hint = hintValue
-        inputType = if (numeric)
+        inputType = if (numeric) {
             InputType.TYPE_CLASS_NUMBER or
                 InputType.TYPE_NUMBER_FLAG_DECIMAL
-        else InputType.TYPE_CLASS_TEXT
+        } else {
+            InputType.TYPE_CLASS_TEXT
+        }
 
         textSize = 15f
         setTextColor(ink)
@@ -114,6 +118,17 @@ class MainActivity : Activity() {
     private fun fmt(value: Double): String =
         String.format(Locale.US, "%.2f", value)
 
+    private fun message(value: String) {
+        Toast.makeText(this, value, Toast.LENGTH_LONG).show()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::refreshList.isInitialized) {
+            refreshList()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -133,7 +148,7 @@ class MainActivity : Activity() {
         scroll.addView(layout)
         setContentView(scroll)
 
-        // GREEN HEADER
+        // HEADER
 
         val header = vertical().apply {
             setPadding(dp(22), dp(23), dp(22), dp(23))
@@ -246,10 +261,7 @@ class MainActivity : Activity() {
 
         val fieldView = FieldDesignerView(this).apply {
             background = bg(pale, 14)
-            layoutParams = LinearLayout.LayoutParams(
-                -1,
-                dp(250)
-            ).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, dp(250)).apply {
                 bottomMargin = dp(12)
             }
         }
@@ -259,11 +271,7 @@ class MainActivity : Activity() {
         val nameInput = input("Field name", false)
         fieldCard.addView(nameInput)
 
-        val shapes = arrayOf(
-            "Rectangle",
-            "Oval",
-            "Circle"
-        )
+        val shapes = arrayOf("Rectangle", "Oval", "Circle")
 
         val shapeSelector = Spinner(this).apply {
             adapter = ArrayAdapter(
@@ -286,24 +294,16 @@ class MainActivity : Activity() {
         // PLANTING DETAILS
 
         val plantingCard = card()
-        plantingCard.addView(
-            heading("🚜 Planting details")
-        )
+        plantingCard.addView(heading("🚜 Planting details"))
 
         val rowInput = input("Row spacing (metres)")
         val plantInput = input("Plant spacing (metres)")
 
         plantingCard.addView(rowInput)
         plantingCard.addView(plantInput)
+        plantingCard.addView(text("Maize variety", 13f, muted))
 
-        plantingCard.addView(
-            text("Maize variety", 13f, muted)
-        )
-
-        val varieties = arrayOf(
-            "White maize",
-            "Yellow maize"
-        )
+        val varieties = arrayOf("White maize", "Yellow maize")
 
         val maizeSelector = Spinner(this).apply {
             adapter = ArrayAdapter(
@@ -315,19 +315,14 @@ class MainActivity : Activity() {
 
         plantingCard.addView(maizeSelector)
 
-        val yieldInput = input(
-            "Expected tons per hectare"
-        )
-
+        val yieldInput = input("Expected tons per hectare")
         plantingCard.addView(yieldInput)
         layout.addView(plantingCard)
 
         // HARVEST ESTIMATE
 
         val estimateCard = card()
-        estimateCard.addView(
-            heading("📊 Harvest estimate")
-        )
+        estimateCard.addView(heading("📊 Harvest estimate"))
 
         val result = text(
             "Enter your field measurements to calculate.",
@@ -337,10 +332,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(10), 0, dp(12))
         }
 
-        val calculateButton = button(
-            "Calculate harvest"
-        )
-
+        val calculateButton = button("Calculate harvest")
         estimateCard.addView(calculateButton)
         estimateCard.addView(result)
         layout.addView(estimateCard)
@@ -348,9 +340,7 @@ class MainActivity : Activity() {
         // FIELD MANAGEMENT
 
         val management = card()
-        management.addView(
-            heading("💾 Field management")
-        )
+        management.addView(heading("💾 Field management"))
 
         val editingLabel = text(
             "Creating a new field",
@@ -363,14 +353,8 @@ class MainActivity : Activity() {
         management.addView(editingLabel)
 
         val saveButton = button("Save as new field")
-        val updateButton = button(
-            "Update selected field",
-            true
-        )
-        val newButton = button(
-            "Clear / new field",
-            true
-        )
+        val updateButton = button("Update selected field", true)
+        val newButton = button("Clear / new field", true)
 
         management.addView(saveButton)
         management.addView(updateButton)
@@ -380,15 +364,13 @@ class MainActivity : Activity() {
         // SAVED FIELDS
 
         val savedCard = card()
-        savedCard.addView(
-            heading("🌾 My saved fields")
-        )
+        savedCard.addView(heading("🌾 My saved fields"))
 
         val fieldList = vertical()
         savedCard.addView(fieldList)
         layout.addView(savedCard)
 
-        // FIELD SHAPE SELECTION
+        // SHAPE SELECTION
 
         shapeSelector.onItemSelectedListener =
             object : AdapterView.OnItemSelectedListener {
@@ -400,9 +382,11 @@ class MainActivity : Activity() {
                 ) {
                     fieldView.fieldShape = shapes[position]
                     lengthInput.visibility =
-                        if (shapes[position] == "Circle")
+                        if (shapes[position] == "Circle") {
                             View.GONE
-                        else View.VISIBLE
+                        } else {
+                            View.VISIBLE
+                        }
                 }
 
                 override fun onNothingSelected(
@@ -410,7 +394,7 @@ class MainActivity : Activity() {
                 ) {}
             }
 
-        // READ FIELD INPUTS
+        // READ INPUTS
 
         fun readField(id: String): SavedField? {
             val name = nameInput.text.toString().trim()
@@ -448,11 +432,7 @@ class MainActivity : Activity() {
                 l > Float.MAX_VALUE ||
                 row > Float.MAX_VALUE
             ) {
-                Toast.makeText(
-                    this,
-                    "Enter a field name and valid measurements.",
-                    Toast.LENGTH_LONG
-                ).show()
+                message("Enter a field name and valid measurements.")
                 return null
             }
 
@@ -469,7 +449,7 @@ class MainActivity : Activity() {
             )
         }
 
-        // CALCULATE HARVEST
+        // CALCULATIONS
 
         fun showCalculation(field: SavedField) {
             val hectares = field.hectares()
@@ -495,7 +475,7 @@ class MainActivity : Activity() {
                 "🚜 Estimated harvest: ${fmt(tons)} tons"
         }
 
-        // OPEN SAVED FIELD
+        // OPEN FIELD FOR EDITING
 
         fun openField(field: SavedField) {
             editingId = field.id
@@ -512,13 +492,10 @@ class MainActivity : Activity() {
             )
 
             maizeSelector.setSelection(
-                varieties.indexOf(
-                    field.maizeVariety
-                ).coerceAtLeast(0)
+                varieties.indexOf(field.maizeVariety).coerceAtLeast(0)
             )
 
             editingLabel.text = "Editing: ${field.name}"
-
             showCalculation(field)
             scroll.smoothScrollTo(0, 0)
         }
@@ -527,29 +504,14 @@ class MainActivity : Activity() {
 
         fun recordHarvest(field: SavedField) {
             val dialogLayout = vertical().apply {
-                setPadding(
-                    dp(22),
-                    dp(12),
-                    dp(22),
-                    dp(8)
-                )
+                setPadding(dp(22), dp(12), dp(22), dp(8))
             }
 
-            val hectaresInput = input(
-                "Total hectares harvested"
-            )
+            val hectaresInput = input("Total hectares harvested")
+            val tonsInput = input("Total tons harvested")
 
-            val tonsInput = input(
-                "Total tons harvested"
-            )
-
-            hectaresInput.setText(
-                field.harvestedHectares.toString()
-            )
-
-            tonsInput.setText(
-                field.harvestedTons.toString()
-            )
+            hectaresInput.setText(field.harvestedHectares.toString())
+            tonsInput.setText(field.harvestedTons.toString())
 
             dialogLayout.addView(
                 text(
@@ -575,7 +537,6 @@ class MainActivity : Activity() {
                 ).setOnClickListener {
                     val hectares = hectaresInput.text
                         .toString().toDoubleOrNull()
-
                     val tons = tonsInput.text
                         .toString().toDoubleOrNull()
 
@@ -588,11 +549,7 @@ class MainActivity : Activity() {
                         tons < 0 ||
                         hectares > field.hectares() + 0.000001
                     ) {
-                        Toast.makeText(
-                            this,
-                            "Enter valid totals within the field area.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        message("Enter valid totals within the field area.")
                     } else {
                         field.harvestedHectares = hectares
                         field.harvestedTons = tons
@@ -601,11 +558,7 @@ class MainActivity : Activity() {
                             dialog.dismiss()
                             refreshList()
                         } else {
-                            Toast.makeText(
-                                this,
-                                "Could not save harvest.",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            message("Could not save harvest.")
                         }
                     }
                 }
@@ -614,11 +567,10 @@ class MainActivity : Activity() {
             dialog.show()
         }
 
-        // REFRESH SAVED FIELDS
+        // REFRESH DASHBOARD AND FIELD CARDS
 
         refreshList = {
             fieldList.removeAllViews()
-
             val fields = storage.loadFields()
 
             (areaMetric.getChildAt(1) as TextView).text =
@@ -647,12 +599,7 @@ class MainActivity : Activity() {
 
             for (field in fields) {
                 val item = vertical().apply {
-                    setPadding(
-                        dp(14),
-                        dp(15),
-                        dp(14),
-                        dp(14)
-                    )
+                    setPadding(dp(14), dp(15), dp(14), dp(14))
                     background = bg(pale, 14)
                     layoutParams =
                         LinearLayout.LayoutParams(-1, -2).apply {
@@ -661,12 +608,7 @@ class MainActivity : Activity() {
                 }
 
                 item.addView(
-                    text(
-                        "🌽 ${field.name}",
-                        18f,
-                        forest,
-                        true
-                    )
+                    text("🌽 ${field.name}", 18f, forest, true)
                 )
 
                 item.addView(
@@ -693,258 +635,17 @@ class MainActivity : Activity() {
                         max = 100
                         progress = field.harvestProgress()
                             .toInt().coerceIn(0, 100)
-
                         progressTintList =
                             ColorStateList.valueOf(green)
-
                         layoutParams =
-                            LinearLayout.LayoutParams(
-                                -1,
-                                dp(9)
-                            ).apply {
+                            LinearLayout.LayoutParams(-1, dp(9)).apply {
                                 bottomMargin = dp(12)
                             }
                     }
                 )
 
-                // EDIT FIELD
+                // MAIZE GROWTH PICTURE
 
-                item.addView(
-                    button("Edit field").apply {
-                        setOnClickListener {
-                            openField(field)
-                        }
-                    }
-                )
-
-                // FIELD WEATHER
-
-                item.addView(
-                    button(
-                        "Check field weather",
-                        true
-                    ).apply {
-                        setOnClickListener {
-                            startActivity(
-                                Intent(
-                                    this@MainActivity,
-                                    WeatherActivity::class.java
-                                ).putExtra(
-                                    "field_id",
-                                    field.id
-                                )
-                            )
-                        }
-                    }
-                )
-
-                // HARVEST
-
-                item.addView(
-                    button("Record harvest").apply {
-                        setOnClickListener {
-                            recordHarvest(field)
-                        }
-                    }
-                )
-
-                // DUPLICATE FIELD
-
-                item.addView(
-                    button(
-                        "Duplicate field",
-                        true
-                    ).apply {
-                        setOnClickListener {
-                            val copy = field.copy(
-                                id = UUID.randomUUID().toString(),
-                                name = "${field.name} Copy",
-                                harvestedHectares = 0.0,
-                                harvestedTons = 0.0
-                            )
-
-                            if (storage.addField(copy)) {
-                                refreshList()
-                            } else {
-                                Toast.makeText(
-                                    this@MainActivity,
-                                    "Could not duplicate field.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }
-                )
-
-                // DELETE FIELD
-
-                item.addView(
-                    button(
-                        "Delete field",
-                        true
-                    ).apply {
-                        setOnClickListener {
-                            AlertDialog.Builder(this@MainActivity)
-                                .setTitle("Delete field?")
-                                .setMessage(
-                                    "Delete ${field.name} and its harvest totals?"
-                                )
-                                .setPositiveButton("Delete") { _, _ ->
-                                    if (storage.deleteField(field.id)) {
-                                        if (editingId == field.id) {
-                                            editingId = null
-                                            editingLabel.text =
-                                                "Creating a new field"
-                                        }
-                                        refreshList()
-                                    } else {
-                                        Toast.makeText(
-                                            this@MainActivity,
-                                            "Could not delete field.",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                                .setNegativeButton(
-                                    "Cancel",
-                                    null
-                                )
-                                .show()
-                        }
-                    }
-                )
-
-                fieldList.addView(item)
-            }
-        }
-
-        // CALCULATE BUTTON
-
-        calculateButton.setOnClickListener {
-            readField(
-                editingId ?: UUID.randomUUID().toString()
-            )?.let {
-                showCalculation(it)
-            }
-        }
-
-        // SAVE NEW FIELD
-
-        saveButton.setOnClickListener {
-            val field = readField(
-                UUID.randomUUID().toString()
-            )
-
-            if (field != null) {
-                if (storage.addField(field)) {
-                    editingId = field.id
-                    editingLabel.text =
-                        "Editing: ${field.name}"
-
-                    showCalculation(field)
-                    refreshList()
-
-                    Toast.makeText(
-                        this,
-                        "Field saved successfully!",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    Toast.makeText(
-                        this,
-                        "Could not save field.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
-
-        // UPDATE EXISTING FIELD
-
-        updateButton.setOnClickListener {
-            val id = editingId
-
-            if (id == null) {
-                Toast.makeText(
-                    this,
-                    "Open a saved field first.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                val updated = readField(id)
-                val previous = storage.loadFields()
-                    .firstOrNull { it.id == id }
-
-                if (updated != null && previous != null) {
-                    updated.harvestedHectares =
-                        previous.harvestedHectares
-
-                    updated.harvestedTons =
-                        previous.harvestedTons
-
-                    if (
-                        updated.harvestedHectares >
-                        updated.hectares() + 0.000001
-                    ) {
-                        Toast.makeText(
-                            this,
-                            "Field size is smaller than harvested area.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    } else if (storage.updateField(updated)) {
-                        editingLabel.text =
-                            "Editing: ${updated.name}"
-
-                        showCalculation(updated)
-                        refreshList()
-
-                        Toast.makeText(
-                            this,
-                            "Field updated!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        Toast.makeText(
-                            this,
-                            "Could not update field.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            }
-        }
-
-        // CLEAR / NEW FIELD
-
-        newButton.setOnClickListener {
-            editingId = null
-
-            listOf(
-                nameInput,
-                widthInput,
-                lengthInput,
-                rowInput,
-                plantInput,
-                yieldInput
-            ).forEach {
-                it.text.clear()
-            }
-
-            shapeSelector.setSelection(0)
-            maizeSelector.setSelection(0)
-
-            fieldView.fieldWidth = 200f
-            fieldView.fieldLength = 300f
-            fieldView.rowSpacing = 0.75f
-            fieldView.fieldShape = "Rectangle"
-
-            editingLabel.text = "Creating a new field"
-            result.text =
-                "Enter your field measurements to calculate."
-
-            scroll.smoothScrollTo(0, 0)
-        }
-
-        refreshList()
-    }
-}
+                if (field.growthStage.isNotBlank()) {
+                    item.addView(
+                        Mai
