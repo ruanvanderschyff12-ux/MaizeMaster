@@ -1,4 +1,3 @@
-
 package com.maizemaster.app
 
 import android.app.Activity
@@ -85,35 +84,20 @@ class DashboardActivity : Activity() {
             setPadding(24, 24, 24, 40)
         }
 
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 28, 24, 28)
-            background = rounded(darkGreen)
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.maizemaster_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            adjustViewBounds = true
+            contentDescription = "MaizeMaster - Plan, Grow, Monitor, Harvest"
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 12)
+            }
         }
 
-        header.addView(
-            text("🌽 MaizeMaster", 29f, true, Color.WHITE)
-        )
-
-        header.addView(
-            text(
-                "Your Smart Farming Dashboard",
-                16f,
-                false,
-                Color.WHITE
-            )
-        )
-
-        header.addView(
-            text(
-                "Manage your maize fields and harvests",
-                14f,
-                false,
-                Color.WHITE
-            )
-        )
-
-        layout.addView(header)
+        layout.addView(logo)
 
         layout.addView(
             text("🌾 Farm Overview", 23f, true)
