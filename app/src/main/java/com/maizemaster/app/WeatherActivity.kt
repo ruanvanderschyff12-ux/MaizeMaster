@@ -125,6 +125,13 @@ class WeatherActivity : Activity() {
 
         layout.addView(result)
 
+        // New disease identification library button
+        layout.addView(
+            button("🔬 MAIZE DISEASE IDENTIFICATION") {
+                DiseaseGuide.show(this@WeatherActivity)
+            }
+        )
+
         layout.addView(
             text(
                 "ℹ️ Weather forecasts are estimates. " +
