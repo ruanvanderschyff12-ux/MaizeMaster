@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
+import android.graphics.RadialGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
@@ -87,10 +88,13 @@ class MaizeGrowthView(
         paint.isAntiAlias = true
         paint.color = shade
         paint.style = Paint.Style.FILL
-
+        paint.shader = LinearGradient(left, top, right, bottom,
+            intArrayOf(Color.argb(255, 255, 255, 205), shade, Color.rgb(36, 77, 31)),
+            null, Shader.TileMode.CLAMP)
         canvas.drawOval(
             left, top, right, bottom, paint
         )
+        paint.shader = null
     }
 
     private fun leaf(
@@ -133,8 +137,11 @@ class MaizeGrowthView(
         paint.isAntiAlias = true
         paint.color = shade
         paint.style = Paint.Style.FILL
-
+        paint.shader = LinearGradient(x, y - rise, tipX, y,
+            intArrayOf(Color.rgb(177, 226, 113), shade, Color.rgb(25, 92, 39)),
+            null, Shader.TileMode.CLAMP)
         canvas.drawPath(path, paint)
+        paint.shader = null
 
         line(
             canvas,
@@ -371,7 +378,7 @@ class MaizeGrowthView(
             7f
         )
 
-        // MAIN STEM
+        // MAIN STEM — a bright edge and dark edge create a rounded 3D effect.
 
         line(
             canvas,
@@ -382,6 +389,9 @@ class MaizeGrowthView(
             color("#61A63A"),
             6f
         )
+
+        line(canvas, centerX - 2f, soilY - 3f, centerX - 2f, topY + 3f,
+            color("#A5D76E"), 1.5f)
 
         // MAIZE LEAVES
 
@@ -424,6 +434,15 @@ class MaizeGrowthView(
                 }
             )
         }
+
+        // Ground shadow anchors the plant to the soil.
+        paint.reset()
+        paint.isAntiAlias = true
+        paint.shader = RadialGradient(centerX, soilY + 3f, 48f,
+            intArrayOf(Color.argb(130, 27, 30, 16), Color.TRANSPARENT),
+            null, Shader.TileMode.CLAMP)
+        canvas.drawOval(centerX - 50f, soilY - 2f, centerX + 50f, soilY + 14f, paint)
+        paint.shader = null
 
         // TASSEL DEVELOPMENT
 
