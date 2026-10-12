@@ -215,42 +215,23 @@ class MainActivity : Activity() {
         scroll.addView(layout)
         setContentView(scroll)
 
-        // HEADER
-
-        val header = vertical().apply {
-            setPadding(dp(22), dp(23), dp(22), dp(23))
-            background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                intArrayOf(forest, green)
-            ).apply {
-                cornerRadius = dp(22).toFloat()
-            }
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(15)
-            }
+        // Full-width, square-cornered banner.
+        val header = ImageView(this).apply {
+            setImageResource(R.drawable.maizemaster_logo)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            adjustViewBounds = false
+            contentDescription = "MaizeMaster - Your maize farm at a glance"
+            layoutParams = LinearLayout.LayoutParams(-1, dp(175))
         }
-
-        header.addView(
-            ImageView(this).apply {
-                setImageResource(R.drawable.maizemaster_logo)
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                adjustViewBounds = true
-                contentDescription = "MaizeMaster - Your maize farm at a glance"
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            }
-        )
         layout.addView(header)
 
-        // Keep the logo banner edge-to-edge; inset the content below it.
+        // Content cards retain comfortable side margins.
         val content = vertical().apply {
             setPadding(dp(16), dp(16), dp(16), 0)
         }
         layout.addView(content)
 
-        // FARM OVERVIEW
+                // FARM OVERVIEW
 
         val overview = card()
         overview.addView(heading("Farm overview"))
