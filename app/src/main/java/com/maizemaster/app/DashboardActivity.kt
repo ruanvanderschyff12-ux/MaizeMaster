@@ -53,6 +53,24 @@ class DashboardActivity : Activity() {
             .setMessage("This feature is being developed. Your current field management and weather tools are available now.")
             .setPositiveButton("OK", null).show()
     }
+    private fun showFeaturePage(title: String, content: String) {
+        val page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            setBackgroundColor(light)
+        }
+        page.addView(label(title, 23f, true))
+        val scroller = ScrollView(this)
+        scroller.addView(label(content, 16f).apply {
+            setPadding(0, dp(18), 0, dp(18))
+        })
+        page.addView(scroller, LinearLayout.LayoutParams(-1, 0, 1f))
+        val dialog = AlertDialog.Builder(this).setView(page).create()
+        page.addView(button("Back to dashboard") { dialog.dismiss() })
+        dialog.show()
+        dialog.window?.setLayout(-1, -1)
+    }
+
     private fun showGrowth() {
         val fields = storage.loadFields()
         val message = if (fields.isEmpty()) "Save a field first to track maize growth." else fields.joinToString("\n\n") { field ->
@@ -61,14 +79,11 @@ class DashboardActivity : Activity() {
             else "Set planting date and maturity days in My Fields"
             "🌽 ${field.name}\nGrowth: $growth\nPlanted: ${field.plantingDate.ifBlank { "Not set" }}"
         }
-        AlertDialog.Builder(this).setTitle("🌱 Maize Growth Stages")
-            .setMessage(message).setPositiveButton("OK", null).show()
+        showFeaturePage("🌱 Maize Growth Stages", message)
     }
 
     private fun showKnowledge() {
-        AlertDialog.Builder(this).setTitle("📖 Maize Farming Knowledge")
-            .setMessage("PLANTING\nPlant in suitable soil moisture and temperature. Check seed depth, row spacing and plant population.\n\nGROWTH\nScout for uneven emergence, weeds, nutrient deficiencies and leaf damage.\n\nFLOWERING\nHeat and water stress during tasseling and silking can reduce kernel set.\n\nHARVEST\nCheck grain moisture and storage conditions before harvesting.\n\nThese are general guidelines; use local agronomic advice for your field.")
-            .setPositiveButton("OK", null).show()
+        showFeaturePage("📖 Maize Farming Knowledge", "PLANTING\nPlant in suitable soil moisture and temperature. Check seed depth, row spacing and plant population.\n\nGROWTH\nScout for uneven emergence, weeds, nutrient deficiencies and leaf damage.\n\nFLOWERING\nHeat and water stress during tasseling and silking can reduce kernel set.\n\nHARVEST\nCheck grain moisture and storage conditions before harvesting.\n\nThese are general guidelines; use local agronomic advice for your field.")
     }
 
     private fun tile(icon: String, title: String, description: String, action: () -> Unit): LinearLayout =
