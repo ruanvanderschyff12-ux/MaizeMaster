@@ -48,6 +48,9 @@ class DashboardActivity : Activity() {
     }
     private fun openFields() = startActivity(Intent(this, MainActivity::class.java))
     private fun openWeather() = startActivity(Intent(this, WeatherActivity::class.java))
+    private fun openGrowth() = startActivity(Intent(this, GrowthActivity::class.java))
+    private fun openHarvest() = startActivity(Intent(this, HarvestActivity::class.java))
+    private fun openKnowledge() = startActivity(Intent(this, KnowledgeActivity::class.java))
     private fun unavailable(title: String) {
         AlertDialog.Builder(this).setTitle(title)
             .setMessage("This feature is being developed. Your current field management and weather tools are available now.")
@@ -142,10 +145,10 @@ class DashboardActivity : Activity() {
         val items = listOf(
             Triple("🗺️", "Field Designer", "Design your field") to { openFields() },
             Triple("🌤️", "Weather", "Forecast & risks") to { openWeather() },
-            Triple("🌱", "Growth Stages", "Follow crop growth") to { showGrowth() },
+            Triple("🌱", "Growth Stages", "Follow crop growth") to { openGrowth() },
             Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields() },
             Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { DiseaseGuide.show(this) },
-            Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openFields() }
+            Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openHarvest() }
         )
         for (i in 0 until 3) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
