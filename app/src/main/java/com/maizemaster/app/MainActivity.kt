@@ -231,14 +231,16 @@ class MainActivity : Activity() {
         }
 
         header.addView(
-            text("🌽 MaizeMaster", 27f, Color.WHITE, true)
-        )
-        header.addView(
-            text(
-                "Your maize farm at a glance",
-                14f,
-                Color.WHITE
-            )
+            ImageView(this).apply {
+                setImageResource(R.drawable.maizemaster_logo)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                adjustViewBounds = true
+                contentDescription = "MaizeMaster - Your maize farm at a glance"
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
         )
         layout.addView(header)
 
