@@ -33,6 +33,8 @@ class WeatherActivity : Activity() {
     private lateinit var result: TextView
 
     private lateinit var fields: List<SavedField>
+    private val cache by lazy { getSharedPreferences("maizemaster_weather_cache", MODE_PRIVATE) }
+
 
     private val green = Color.rgb(24, 85, 49)
     private val dark = Color.rgb(34, 54, 39)
@@ -448,8 +450,9 @@ class WeatherActivity : Activity() {
                         "Estimated stage: $stage\n\n" +
                             stageOverview(stage)
 
-                    result.text =
-                        "Update the forecast for ${field.name}."
+                    val saved = cache.getString("${field.id}_forecast", null)
+                    result.text = if (saved == null) "No saved forecast yet." else "Last saved forecast (may be outdated):\n\n$saved"
+                    if (latitudeInput.text.isNotBlank() && longitudeInput.text.isNotBlank()) getForecast()
                 }
 
                 override fun onNothingSelected(
@@ -566,7 +569,8 @@ class WeatherActivity : Activity() {
             .commit()
 
         result.text = if (saved) {
-            "Location saved for ${field.name}."
+            getForecast()
+            "Location saved for ${field.name}. Updating forecast..."
         } else {
             "Could not save field location."
         }
@@ -1079,6 +1083,8 @@ class WeatherActivity : Activity() {
                         "plant health and field conditions."
                 )
 
+                cache.edit().putString("${field.id}_forecast", report.toString())
+                    .putLong("${field.id}_updated", System.currentTimeMillis()).apply()
                 runOnUiThread {
                     if (selectedField()?.id != field.id) {
                         return@runOnUiThread
@@ -1126,10 +1132,8 @@ class WeatherActivity : Activity() {
             } catch (e: Exception) {
                 runOnUiThread {
                     if (selectedField()?.id == field.id) {
-                        result.text =
-                            "Could not load forecast. " +
-                                "Check internet and try again.\n" +
-                                "${e.message}"
+                        val saved = cache.getString("${field.id}_forecast", null)
+                        result.text = if (saved != null) "Offline / update failed. Last saved forecast:\n\n$saved" else "Could not load forecast. Check internet and try again.\n${e.message}"
                     }
                 }
             } finally {
