@@ -33,7 +33,7 @@ class WeatherActivity : Activity() {
     private lateinit var result: TextView
 
     private lateinit var fields: List<SavedField>
-    private val cache by lazy { getSharedPreferences("maizemaster_weather_cache", MODE_PRIVATE) }
+    private val cache by lazy { getSharedPreferences("maizemaster_weather_cache", MODE_PRIVATE) }\n    private var latestRequest = 0L
 
 
     private val green = Color.rgb(24, 85, 49)
@@ -1086,7 +1086,7 @@ class WeatherActivity : Activity() {
                 cache.edit().putString("${field.id}_forecast", report.toString())
                     .putLong("${field.id}_updated", System.currentTimeMillis()).apply()
                 runOnUiThread {
-                    if (selectedField()?.id != field.id) {
+                    if (selectedField()?.id != field.id || requestId != latestRequest) {
                         return@runOnUiThread
                     }
 
@@ -1131,7 +1131,7 @@ class WeatherActivity : Activity() {
 
             } catch (e: Exception) {
                 runOnUiThread {
-                    if (selectedField()?.id == field.id) {
+                    if (selectedField()?.id == field.id && requestId == latestRequest) {
                         val saved = cache.getString("${field.id}_forecast", null)
                         result.text = if (saved != null) "Offline / update failed. Last saved forecast:\n\n$saved" else "Could not load forecast. Check internet and try again.\n${e.message}"
                     }
