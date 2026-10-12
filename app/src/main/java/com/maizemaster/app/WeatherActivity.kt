@@ -4,8 +4,12 @@ package com.maizemaster.app
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.location.LocationManager
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.widget.*
 import org.json.JSONObject
@@ -18,11 +22,22 @@ class WeatherActivity : Activity() {
     private lateinit var fieldSelector: Spinner
     private lateinit var latitudeInput: EditText
     private lateinit var longitudeInput: EditText
-    private lateinit var result: TextView
-    private lateinit var stageInfo: TextView
     private lateinit var weatherBanner: WeatherBannerView
+    private lateinit var temperatureText: TextView
+    private lateinit var conditionText: TextView
+    private lateinit var highLowText: TextView
+    private lateinit var rainText: TextView
+    private lateinit var humidityText: TextView
+    private lateinit var windText: TextView
+    private lateinit var stageInfo: TextView
+    private lateinit var result: TextView
 
     private lateinit var fields: List<SavedField>
+
+    private val green = Color.rgb(24, 85, 49)
+    private val dark = Color.rgb(34, 54, 39)
+    private val muted = Color.rgb(105, 120, 107)
+    private val background = Color.rgb(245, 248, 243)
 
     private val locations by lazy {
         getSharedPreferences(
@@ -34,14 +49,63 @@ class WeatherActivity : Activity() {
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
-    private fun text(
+    private fun shape(
+        color: Int,
+        radius: Int = 18
+    ): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+        }
+
+    private fun label(
         value: String,
-        size: Float = 16f
+        size: Float = 15f,
+        bold: Boolean = false,
+        color: Int = dark
     ): TextView = TextView(this).apply {
         text = value
         textSize = size
-        setTextColor(0xFF243D29.toInt())
-        setPadding(dp(8), dp(10), dp(8), dp(10))
+        setTextColor(color)
+        if (bold) {
+            setTypeface(null, Typeface.BOLD)
+        }
+    }
+
+    private fun card(): LinearLayout =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                dp(16), dp(16),
+                dp(16), dp(16)
+            )
+            background = shape(Color.WHITE)
+            elevation = dp(2).toFloat()
+        }
+
+    private fun addCard(
+        parent: LinearLayout,
+        child: View,
+        top: Int = 12
+    ) {
+        parent.addView(
+            child,
+            LinearLayout.LayoutParams(
+                -1,
+                -2
+            ).apply {
+                topMargin = dp(top)
+            }
+        )
+    }
+
+    private fun button(
+        title: String,
+        action: () -> Unit
+    ): Button = Button(this).apply {
+        text = title
+        isAllCaps = false
+        setOnClickListener { action() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,27 +113,37 @@ class WeatherActivity : Activity() {
 
         fields = FieldStorage(this).loadFields()
 
-        val layout = LinearLayout(this).apply {
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(32))
-            setBackgroundColor(0xFFF5F8F3.toInt())
+            setPadding(
+                dp(16), dp(18),
+                dp(16), dp(32)
+            )
+            setBackgroundColor(background)
         }
 
-        fun button(
-            title: String,
-            action: () -> Unit
-        ): Button = Button(this).apply {
-            text = title
-            isAllCaps = false
-            setOnClickListener { action() }
-        }
-
-        layout.addView(
-            text("🌽 MaizeMaster Weather", 24f)
+        root.addView(
+            label(
+                "🌽 MaizeMaster",
+                26f,
+                true,
+                green
+            )
         )
 
-        layout.addView(
-            text("Select Your Maize Field", 18f)
+        root.addView(
+            label(
+                "Smart Weather Dashboard",
+                15f,
+                false,
+                muted
+            )
+        )
+
+        val fieldCard = card()
+
+        fieldCard.addView(
+            label("YOUR MAIZE FIELD", 12f, true, muted)
         )
 
         fieldSelector = Spinner(this).apply {
@@ -82,30 +156,212 @@ class WeatherActivity : Activity() {
             )
         }
 
-        layout.addView(fieldSelector)
+        fieldCard.addView(fieldSelector)
+        addCard(root, fieldCard, 18)
 
-        // Illustrated maize field weather banner
+        // Illustrated weather hero
+        val hero = FrameLayout(this).apply {
+            background = shape(green, 20)
+            clipToOutline = true
+        }
+
         weatherBanner = WeatherBannerView(this).apply {
             growthStage = "Vegetative growth"
             condition = "Partly cloudy"
         }
 
-        layout.addView(
+        hero.addView(
             weatherBanner,
+            FrameLayout.LayoutParams(-1, -1)
+        )
+
+        // Dark translucent overlay keeps text readable.
+        val overlay = View(this).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    Color.argb(195, 11, 46, 48),
+                    Color.argb(85, 11, 46, 48),
+                    Color.TRANSPARENT
+                )
+            )
+        }
+
+        hero.addView(
+            overlay,
+            FrameLayout.LayoutParams(-1, -1)
+        )
+
+        val heroContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(
+                dp(20), dp(18),
+                dp(16), dp(16)
+            )
+        }
+
+        heroContent.addView(
+            label(
+                "CURRENT WEATHER",
+                12f,
+                true,
+                Color.WHITE
+            )
+        )
+
+        temperatureText = label(
+            "--°",
+            58f,
+            true,
+            Color.WHITE
+        )
+
+        heroContent.addView(temperatureText)
+
+        conditionText = label(
+            "Load your local forecast",
+            18f,
+            true,
+            Color.WHITE
+        )
+
+        heroContent.addView(conditionText)
+
+        highLowText = label(
+            "High --°  •  Low --°",
+            14f,
+            false,
+            Color.WHITE
+        )
+
+        heroContent.addView(highLowText)
+
+        hero.addView(
+            heroContent,
+            FrameLayout.LayoutParams(
+                -1,
+                -2,
+                Gravity.TOP
+            )
+        )
+
+        root.addView(
+            hero,
             LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(220)
+                -1,
+                dp(230)
             ).apply {
-                topMargin = dp(12)
-                bottomMargin = dp(12)
+                topMargin = dp(14)
             }
         )
 
-        stageInfo = text("", 15f)
-        layout.addView(stageInfo)
+        // Live weather metrics
+        val metrics = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
 
-        layout.addView(
-            text("📍 Field Location", 19f)
+        fun metric(
+            icon: String,
+            title: String
+        ): Pair<LinearLayout, TextView> {
+            val box = card().apply {
+                gravity = Gravity.CENTER
+                setPadding(
+                    dp(5), dp(13),
+                    dp(5), dp(13)
+                )
+            }
+
+            box.addView(
+                label(icon, 24f).apply {
+                    gravity = Gravity.CENTER
+                }
+            )
+
+            val value = label(
+                "--",
+                18f,
+                true,
+                green
+            ).apply {
+                gravity = Gravity.CENTER
+            }
+
+            box.addView(value)
+
+            box.addView(
+                label(
+                    title,
+                    11f,
+                    false,
+                    muted
+                ).apply {
+                    gravity = Gravity.CENTER
+                }
+            )
+
+            return Pair(box, value)
+        }
+
+        val rainMetric = metric("🌧️", "Rain chance")
+        val humidityMetric = metric("💧", "Humidity")
+        val windMetric = metric("💨", "Wind")
+
+        rainText = rainMetric.second
+        humidityText = humidityMetric.second
+        windText = windMetric.second
+
+        listOf(
+            rainMetric.first,
+            humidityMetric.first,
+            windMetric.first
+        ).forEachIndexed { index, view ->
+            metrics.addView(
+                view,
+                LinearLayout.LayoutParams(
+                    0,
+                    -2,
+                    1f
+                ).apply {
+                    if (index > 0) {
+                        leftMargin = dp(7)
+                    }
+                }
+            )
+        }
+
+        addCard(root, metrics)
+
+        // Growth information
+        val growthCard = card()
+
+        growthCard.addView(
+            label(
+                "🌱 Maize Growth Conditions",
+                19f,
+                true,
+                green
+            )
+        )
+
+        stageInfo = label(
+            "Select a saved maize field.",
+            14f
+        )
+
+        growthCard.addView(stageInfo)
+        addCard(root, growthCard)
+
+        // Location controls
+        val locationCard = card()
+
+        locationCard.addView(
+            label(
+                "📍 Field Weather Location",
+                18f,
+                true,
+                green
+            )
         )
 
         latitudeInput = EditText(this).apply {
@@ -118,52 +374,80 @@ class WeatherActivity : Activity() {
             inputType = 12290
         }
 
-        layout.addView(latitudeInput)
-        layout.addView(longitudeInput)
+        locationCard.addView(latitudeInput)
+        locationCard.addView(longitudeInput)
 
-        layout.addView(
-            button("📍 USE PHONE GPS") {
+        locationCard.addView(
+            button("📍 Use Phone GPS") {
                 useGps()
             }
         )
 
-        layout.addView(
-            button("💾 SAVE FIELD LOCATION") {
+        locationCard.addView(
+            button("💾 Save Field Location") {
                 saveLocation()
             }
         )
 
-        layout.addView(
-            button("🌦️ GET 7-DAY WEATHER ADVICE") {
-                getForecast()
-            }
-        )
+        addCard(root, locationCard)
 
-        result = text(
-            "Select a field, enter its location " +
-                "and load the forecast."
-        )
+        val loadButton = button(
+            "🌤️ Update Weather Forecast"
+        ) {
+            getForecast()
+        }
 
-        layout.addView(result)
+        addCard(root, loadButton)
 
-        layout.addView(
-            button("🔬 MAIZE DISEASE IDENTIFICATION") {
-                DiseaseGuide.show(this@WeatherActivity)
-            }
-        )
+        // Forecast and farming advice
+        val forecastCard = card()
 
-        layout.addView(
-            text(
-                "ℹ️ Weather forecasts are estimates. " +
-                    "Positive and negative effects are " +
-                    "possible outcomes, not confirmed " +
-                    "crop conditions.",
-                13f
+        forecastCard.addView(
+            label(
+                "📅 7-Day Maize Weather Outlook",
+                19f,
+                true,
+                green
             )
         )
 
+        result = label(
+            "Choose a field and update the weather " +
+                "to see its forecast, benefits, " +
+                "risks and recommended actions.",
+            14f
+        )
+
+        forecastCard.addView(result)
+        addCard(root, forecastCard)
+
+        addCard(
+            root,
+            button("🔬 Maize Disease Identification") {
+                DiseaseGuide.show(this)
+            }
+        )
+
+        root.addView(
+            label(
+                "ℹ️ Forecasts are estimates. Weather " +
+                    "conditions can increase crop risks, " +
+                    "but they cannot confirm disease, " +
+                    "flooding or crop damage. " +
+                    "Always inspect the field.",
+                12f,
+                false,
+                muted
+            ).apply {
+                setPadding(
+                    dp(4), dp(18),
+                    dp(4), dp(8)
+                )
+            }
+        )
+
         val scroll = ScrollView(this)
-        scroll.addView(layout)
+        scroll.addView(root)
         setContentView(scroll)
 
         fieldSelector.onItemSelectedListener =
@@ -192,16 +476,23 @@ class WeatherActivity : Activity() {
                     )
 
                     val stage = growthStage(field)
-
-                    // Update maize illustration automatically
                     weatherBanner.growthStage = stage
 
+                    // Reset old field's weather values.
+                    weatherBanner.condition = "Partly cloudy"
+                    temperatureText.text = "--°"
+                    conditionText.text = "Update local weather"
+                    highLowText.text = "High --°  •  Low --°"
+                    rainText.text = "--"
+                    humidityText.text = "--"
+                    windText.text = "--"
+
                     stageInfo.text =
-                        "🌱 Estimated growth stage: $stage\n\n" +
+                        "Estimated stage: $stage\n\n" +
                         stageOverview(stage)
 
                     result.text =
-                        "Load the forecast for ${field.name}."
+                        "Update the forecast for ${field.name}."
                 }
 
                 override fun onNothingSelected(
@@ -235,84 +526,58 @@ class WeatherActivity : Activity() {
         val s = stage.lowercase(Locale.US)
 
         return when {
-            "harvest" in s ||
-                "maturity" in s -> 6
-
-            "dent" in s ||
-                "dough" in s ||
+            "harvest" in s || "maturity" in s -> 6
+            "dent" in s || "dough" in s ||
                 "grain filling" in s -> 5
-
-            "milk" in s ||
-                "blister" in s -> 4
-
-            "silk" in s ||
-                "tassel" in s -> 3
-
+            "milk" in s || "blister" in s -> 4
+            "silk" in s || "tassel" in s -> 3
             "vegetative" in s -> 2
-
-            "seedling" in s ||
-                "emergence" in s ||
+            "seedling" in s || "emergence" in s ||
                 "germination" in s -> 1
-
             else -> 0
         }
     }
 
     private fun stageOverview(stage: String): String =
         when (stageType(stage)) {
+            1 -> "Warm, well-drained soil supports " +
+                "emergence. Waterlogging and cold " +
+                "soil may increase seed rot risk."
 
-            1 -> "🌱 Germination / seedling\n" +
-                "Positive: Warm, moist, well-drained " +
-                "soil supports emergence.\n" +
-                "Negative: Cold, waterlogged soil may " +
-                "cause poor emergence and seed rot."
+            2 -> "Sunlight, moisture and moderate " +
+                "temperatures support leaf growth. " +
+                "Watch for drought, flooding and hail."
 
-            2 -> "🌿 Vegetative growth\n" +
-                "Positive: Sunlight, moisture and " +
-                "moderate warmth support leaf growth.\n" +
-                "Negative: Drought, flooding, hail " +
-                "and frost can damage plants."
+            3 -> "Adequate moisture supports " +
+                "pollination. Heat and drought can " +
+                "reduce successful kernel set."
 
-            3 -> "🌽 Tasseling / silking\n" +
-                "Positive: Adequate water supports " +
-                "pollination and kernel set.\n" +
-                "Negative: Heat and drought can " +
-                "reduce successful fertilization."
+            4 -> "Healthy leaves and adequate " +
+                "water support young kernels. " +
+                "Severe stress can cause abortion."
 
-            4 -> "🌽 Early kernel development\n" +
-                "Positive: Moisture and healthy " +
-                "leaves support developing kernels.\n" +
-                "Negative: Severe stress may cause " +
-                "kernel abortion."
+            5 -> "Sunlight and moisture support " +
+                "grain filling. Heat, drought and " +
+                "leaf damage may reduce kernel weight."
 
-            5 -> "🌽 Grain filling\n" +
-                "Positive: Sunlight and adequate " +
-                "water support heavier kernels.\n" +
-                "Negative: Heat, drought and leaf " +
-                "damage may reduce kernel weight."
-
-            6 -> "🚜 Maturity / harvest\n" +
-                "Positive: Dry weather can support " +
-                "grain dry-down and field access.\n" +
-                "Negative: Rain, lodging and mold " +
-                "can delay harvest or reduce quality."
+            6 -> "Dry weather helps grain dry-down. " +
+                "Wet weather may delay harvesting " +
+                "and increase quality risks."
 
             else -> "Set a planting date and maturity " +
-                "duration for growth-stage advice."
+                "duration to estimate growth stage."
         }
 
     private fun coordinates(): Pair<Double, Double>? {
-        val lat = latitudeInput.text
-            .toString().toDoubleOrNull()
+        val lat = latitudeInput.text.toString()
+            .toDoubleOrNull()
 
-        val lon = longitudeInput.text
-            .toString().toDoubleOrNull()
+        val lon = longitudeInput.text.toString()
+            .toDoubleOrNull()
 
         if (
-            lat == null ||
-            lon == null ||
-            !lat.isFinite() ||
-            !lon.isFinite() ||
+            lat == null || lon == null ||
+            !lat.isFinite() || !lon.isFinite() ||
             lat !in -90.0..90.0 ||
             lon !in -180.0..180.0
         ) {
@@ -326,7 +591,7 @@ class WeatherActivity : Activity() {
 
     private fun saveLocation() {
         val field = selectedField() ?: run {
-            result.text = "Please save a field first."
+            result.text = "Save a maize field first."
             return
         }
 
@@ -391,7 +656,7 @@ class WeatherActivity : Activity() {
             if (position == null) {
                 result.text =
                     "GPS unavailable. Try again outdoors " +
-                    "or enter coordinates."
+                    "or enter coordinates manually."
                 return
             }
 
@@ -406,8 +671,7 @@ class WeatherActivity : Activity() {
             saveLocation()
 
             result.append(
-                "\nVerify that this position " +
-                    "is at your actual field."
+                "\nCheck that this is your actual field."
             )
 
         } catch (e: Exception) {
@@ -442,6 +706,19 @@ class WeatherActivity : Activity() {
         }
     }
 
+    private fun weatherDescription(code: Int): String =
+        when (code) {
+            0 -> "Clear sky"
+            1, 2 -> "Partly cloudy"
+            3 -> "Cloudy"
+            45, 48 -> "Foggy"
+            in 51..67 -> "Rain"
+            in 71..77 -> "Snow"
+            in 80..82 -> "Rain showers"
+            in 95..99 -> "Storm"
+            else -> "Variable conditions"
+        }
+
     private fun dailyAdvice(
         stage: String,
         high: Double,
@@ -457,37 +734,34 @@ class WeatherActivity : Activity() {
 
         if (rain in 5.0..20.0) {
             positives.add(
-                "Rainfall may replenish soil " +
-                    "moisture if drainage is good."
+                "Rain may replenish soil moisture " +
+                    "where drainage is adequate."
             )
         }
 
         if (rain >= 25) {
             negatives.add(
-                "Heavy rainfall may cause " +
-                    "waterlogging, runoff and " +
-                    "nutrient losses."
+                "Heavy rain may cause waterlogging, " +
+                    "runoff and nutrient losses."
             )
             actions.add(
                 "Inspect drainage and standing water."
             )
         }
 
-        if (high in 20.0..30.0 && low > 5) {
-            if (phase in 1..5) {
-                positives.add(
-                    "Moderate warmth may support " +
-                        "maize growth when soil " +
-                        "moisture is adequate."
-                )
-            }
+        if (high in 20.0..30.0 && low > 5 &&
+            phase in 1..5
+        ) {
+            positives.add(
+                "Moderate warmth may support " +
+                    "maize growth if moisture is adequate."
+            )
         }
 
         if (high >= 35) {
             negatives.add(
-                "Very hot weather can increase " +
-                    "water stress and reduce " +
-                    "photosynthesis."
+                "Extreme heat may increase water " +
+                    "stress and reduce photosynthesis."
             )
             actions.add(
                 "Check soil moisture and leaf stress."
@@ -496,33 +770,27 @@ class WeatherActivity : Activity() {
 
         if (rain < 1 && high >= 30) {
             negatives.add(
-                "Hot, dry conditions can " +
-                    "increase water demand. " +
-                    "One dry day alone does " +
-                    "not establish drought."
-            )
-            actions.add(
-                "Inspect actual soil moisture."
+                "Hot, dry weather may increase " +
+                    "water demand; one day does not " +
+                    "establish drought."
             )
         }
 
         if (low <= 2) {
             negatives.add(
-                "Cold weather may indicate " +
-                    "frost risk in some locations."
+                "Cold weather may indicate frost risk."
             )
             actions.add(
-                "Check local frost conditions."
+                "Check local frost warnings."
             )
         }
 
         if (wind >= 45) {
             negatives.add(
-                "Strong wind may cause " +
-                    "lodging or broken stalks."
+                "Strong winds may damage or lodge plants."
             )
             actions.add(
-                "Inspect plants after storms."
+                "Inspect stalks after strong winds."
             )
         }
 
@@ -530,63 +798,58 @@ class WeatherActivity : Activity() {
             1 -> {
                 if (rain >= 20) {
                     negatives.add(
-                        "Saturated seedbeds may " +
-                            "reduce oxygen and " +
-                            "increase seed rot risk."
+                        "Wet seedbeds may reduce oxygen " +
+                            "and increase seed rot risk."
                     )
                 }
                 if (high in 20.0..30.0) {
                     positives.add(
-                        "Warm conditions may help " +
-                            "seedling establishment."
+                        "Warm conditions may help emergence."
                     )
                 }
                 actions.add(
-                    "Check emergence and seedling uniformity."
+                    "Check seedling emergence and uniformity."
                 )
             }
 
             2 -> {
                 if (rain in 5.0..20.0) {
                     positives.add(
-                        "Adequate moisture may " +
-                            "support root and leaf development."
+                        "Moisture may support roots " +
+                            "and leaf development."
                     )
                 }
                 if (high >= 33) {
                     negatives.add(
-                        "Heat stress may slow vegetative growth."
+                        "Heat may slow vegetative growth."
                     )
                 }
                 actions.add(
-                    "Inspect leaf condition and plant growth."
+                    "Inspect leaf health and growth."
                 )
             }
 
             3 -> {
-                if (
-                    high in 20.0..30.0 &&
-                    rain < 25
-                ) {
+                if (high in 20.0..30.0 && rain < 25) {
                     positives.add(
-                        "Moderate temperatures " +
-                            "may support pollen shed and silk growth."
+                        "Moderate temperatures may " +
+                            "support pollen shed and silking."
                     )
                 }
                 if (high >= 32) {
                     negatives.add(
-                        "Heat around pollination " +
-                            "may increase poor kernel-set risk, " +
-                            "especially with drought."
+                        "Heat during pollination may " +
+                            "reduce kernel set, especially " +
+                            "under drought stress."
                     )
                     actions.add(
-                        "Check silk development and soil moisture."
+                        "Inspect silks and soil moisture."
                     )
                 }
                 if (rain >= 20) {
                     negatives.add(
-                        "Prolonged wet weather " +
-                            "around silking may favor certain ear rots."
+                        "Prolonged wet conditions near " +
+                            "silking may favor some ear rots."
                     )
                 }
             }
@@ -594,56 +857,58 @@ class WeatherActivity : Activity() {
             4 -> {
                 if (rain in 5.0..20.0) {
                     positives.add(
-                        "Moisture may support young kernel survival."
+                        "Moisture may support young kernels."
                     )
                 }
                 if (high >= 33) {
                     negatives.add(
-                        "Heat and water stress " +
-                            "may increase kernel abortion risk."
+                        "Heat and water stress may " +
+                            "increase kernel abortion risk."
                     )
                 }
-                actions.add("Inspect developing cobs.")
+                actions.add(
+                    "Inspect developing maize cobs."
+                )
             }
 
             5 -> {
-                if (
-                    high in 20.0..30.0 &&
-                    rain < 25
-                ) {
+                if (high in 20.0..30.0 && rain < 25) {
                     positives.add(
-                        "Suitable temperatures and healthy leaves " +
-                            "support grain filling."
+                        "Moderate conditions may support " +
+                            "grain filling."
                     )
                 }
                 if (high >= 33) {
                     negatives.add(
-                        "Heat stress may reduce kernel weight."
+                        "Heat may reduce kernel weight."
                     )
                 }
                 if (rain >= 20) {
                     negatives.add(
-                        "Persistent wet conditions " +
-                            "may increase some ear-rot risks."
+                        "Persistent wet conditions may " +
+                            "increase some ear-rot risks."
                     )
                 }
-                actions.add("Inspect leaves and ears.")
+                actions.add(
+                    "Inspect leaves and ears."
+                )
             }
 
             6 -> {
                 if (rain < 1 && high >= 20) {
                     positives.add(
-                        "Dry weather may help grain dry-down " +
-                            "and harvest access."
+                        "Dry conditions may help " +
+                            "grain dry-down and field access."
                     )
                 }
                 if (rain >= 10) {
                     negatives.add(
-                        "Rain may delay field access and grain drying."
+                        "Rain may delay field access " +
+                            "and grain drying."
                     )
                 }
                 actions.add(
-                    "Measure grain moisture before harvesting."
+                    "Measure grain moisture before harvest."
                 )
             }
         }
@@ -651,19 +916,21 @@ class WeatherActivity : Activity() {
         if (positives.isEmpty()) {
             positives.add(
                 "No specific benefit can be inferred " +
-                    "from these daily forecast values alone."
+                    "from these values alone."
             )
         }
 
         if (negatives.isEmpty()) {
             negatives.add(
-                "No simple threshold warning today. " +
-                    "Continue scouting."
+                "No threshold warning identified. " +
+                    "Continue field scouting."
             )
         }
 
         if (actions.isEmpty()) {
-            actions.add("Check actual field conditions.")
+            actions.add(
+                "Check actual field conditions."
+            )
         }
 
         return buildString {
@@ -694,7 +961,7 @@ class WeatherActivity : Activity() {
         val stage = growthStage(field)
 
         result.text =
-            "Loading weather advice for ${field.name}..."
+            "Loading weather for ${field.name}..."
 
         Thread {
             var connection: HttpURLConnection? = null
@@ -704,12 +971,14 @@ class WeatherActivity : Activity() {
                     "https://api.open-meteo.com/v1/forecast" +
                     "?latitude=${position.first}" +
                     "&longitude=${position.second}" +
-                    "&current=temperature_2m,weather_code" +
+                    "&current=temperature_2m," +
+                    "relative_humidity_2m," +
+                    "weather_code,wind_speed_10m" +
                     "&daily=temperature_2m_max," +
                     "temperature_2m_min," +
                     "precipitation_sum," +
-                    "wind_speed_10m_max," +
-                    "weather_code" +
+                    "precipitation_probability_max," +
+                    "wind_speed_10m_max,weather_code" +
                     "&timezone=auto&forecast_days=7"
 
                 connection =
@@ -732,56 +1001,64 @@ class WeatherActivity : Activity() {
                     }
 
                 val root = JSONObject(response)
+                val current = root.getJSONObject("current")
                 val daily = root.getJSONObject("daily")
 
-                val dates =
-                    daily.getJSONArray("time")
-                val highs =
-                    daily.getJSONArray("temperature_2m_max")
-                val lows =
-                    daily.getJSONArray("temperature_2m_min")
-                val rainfall =
-                    daily.getJSONArray("precipitation_sum")
-                val wind =
-                    daily.getJSONArray("wind_speed_10m_max")
+                val temp = current.getDouble(
+                    "temperature_2m"
+                )
+                val humidity = current.getDouble(
+                    "relative_humidity_2m"
+                )
+                val currentWind = current.getDouble(
+                    "wind_speed_10m"
+                )
+                val code = current.getInt(
+                    "weather_code"
+                )
 
-                val current = root.getJSONObject("current")
-                val currentTemp =
-                    current.getDouble("temperature_2m")
-                val weatherCode =
-                    current.getInt("weather_code")
+                val condition = weatherDescription(code)
 
-                val weatherCondition = when (weatherCode) {
-                    0 -> "Clear sky"
-                    1, 2 -> "Partly cloudy"
-                    3 -> "Cloudy"
-                    45, 48 -> "Foggy"
-                    in 51..67 -> "Rain"
-                    in 71..77 -> "Snow"
-                    in 80..82 -> "Rain showers"
-                    in 95..99 -> "Storm"
-                    else -> "Partly cloudy"
+                val dates = daily.getJSONArray("time")
+                val highs = daily.getJSONArray(
+                    "temperature_2m_max"
+                )
+                val lows = daily.getJSONArray(
+                    "temperature_2m_min"
+                )
+                val rainfall = daily.getJSONArray(
+                    "precipitation_sum"
+                )
+                val winds = daily.getJSONArray(
+                    "wind_speed_10m_max"
+                )
+                val chances = daily.getJSONArray(
+                    "precipitation_probability_max"
+                )
+
+                val highToday = highs.getDouble(0)
+                val lowToday = lows.getDouble(0)
+
+                val rainChance = if (
+                    chances.isNull(0)
+                ) {
+                    "N/A"
+                } else {
+                    "${chances.getDouble(0).toInt()}%"
                 }
 
                 val report = StringBuilder()
 
                 report.append(
                     "🌽 ${field.name}\n" +
-                        "🌱 Growth stage: $stage\n" +
-                        "🌡️ Current temperature: " +
-                        String.format(
-                            Locale.US,
-                            "%.0f°C",
-                            currentTemp
-                        ) +
-                        "\n🌤️ $weatherCondition\n\n"
+                        "🌱 Growth stage: $stage\n\n"
                 )
 
                 for (i in 0 until dates.length()) {
                     val high = highs.getDouble(i)
                     val low = lows.getDouble(i)
                     val rain = rainfall.getDouble(i)
-                    val windSpeed = wind.getDouble(i)
+                    val wind = winds.getDouble(i)
 
                     report.append(
                         String.format(
@@ -795,7 +1072,7 @@ class WeatherActivity : Activity() {
                             low,
                             high,
                             rain,
-                            windSpeed
+                            wind
                         )
                     )
 
@@ -805,40 +1082,72 @@ class WeatherActivity : Activity() {
                             high,
                             low,
                             rain,
-                            windSpeed
+                            wind
                         )
                     )
 
-                    report.append("\n")
+                    report.append("\n\n")
                 }
 
                 report.append(
-                    "⚠️ These are preliminary " +
-                        "weather-based guidelines. " +
-                        "Rainfall does not prove soil " +
-                        "moisture or waterlogging. " +
-                        "Forecasts cannot confirm " +
-                        "disease, frost, hail or crop " +
-                        "damage. Check the field."
+                    "⚠️ Forecast-based guidance only. " +
+                        "Check actual soil moisture, " +
+                        "plant health and field conditions."
                 )
 
                 runOnUiThread {
+                    // Do not show another field's results.
                     if (selectedField()?.id != field.id) {
                         return@runOnUiThread
                     }
 
                     weatherBanner.growthStage = stage
-                    weatherBanner.condition = weatherCondition
+                    weatherBanner.condition = condition
+
+                    temperatureText.text =
+                        String.format(
+                            Locale.US,
+                            "%.0f°",
+                            temp
+                        )
+
+                    conditionText.text = condition
+
+                    highLowText.text =
+                        String.format(
+                            Locale.US,
+                            "High %.0f°  •  Low %.0f°",
+                            highToday,
+                            lowToday
+                        )
+
+                    rainText.text = rainChance
+
+                    humidityText.text =
+                        String.format(
+                            Locale.US,
+                            "%.0f%%",
+                            humidity
+                        )
+
+                    windText.text =
+                        String.format(
+                            Locale.US,
+                            "%.0f km/h",
+                            currentWind
+                        )
 
                     result.text = report.toString()
                 }
 
             } catch (e: Exception) {
                 runOnUiThread {
-                    result.text =
-                        "Could not load forecast. " +
-                        "Check internet and try again.\n" +
-                        "${e.message}"
+                    if (selectedField()?.id == field.id) {
+                        result.text =
+                            "Could not load forecast. " +
+                                "Check internet and try again.\n" +
+                                "${e.message}"
+                    }
                 }
             } finally {
                 connection?.disconnect()
