@@ -9,10 +9,13 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
 import android.view.View
+import kotlin.math.abs
 import kotlin.math.min
-import kotlin.math.sin
 
-class MaizeGrowthView(context: Context) : View(context) {
+class MaizeGrowthView(
+    context: Context,
+    initialStage: String = ""
+) : View(context) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
@@ -21,6 +24,32 @@ class MaizeGrowthView(context: Context) : View(context) {
             field = value.coerceIn(0, 100)
             invalidate()
         }
+
+    init {
+        setStage(initialStage)
+    }
+
+    fun setStage(stage: String) {
+        progressPercent = when {
+            stage.contains("Harvested", true) -> 100
+            stage.contains("Not planted", true) -> 0
+            stage.contains("Planted", true) -> 0
+            stage.contains("Germination", true) -> 3
+            stage.contains("Emergence", true) -> 5
+            stage.contains("Seedling", true) -> 10
+            stage.contains("Late vegetative", true) -> 43
+            stage.contains("Vegetative", true) -> 30
+            stage.contains("Tasseling", true) -> 52
+            stage.contains("Silking", true) -> 58
+            stage.contains("Blister", true) -> 65
+            stage.contains("Milk", true) -> 73
+            stage.contains("Dough", true) -> 82
+            stage.contains("Dent", true) -> 92
+            stage.contains("Grain filling", true) -> 75
+            stage.contains("Physiological maturity", true) -> 100
+            else -> 0
+        }
+    }
 
     private fun color(hex: String): Int =
         Color.parseColor(hex)
@@ -40,7 +69,10 @@ class MaizeGrowthView(context: Context) : View(context) {
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = thickness
         paint.strokeCap = Paint.Cap.ROUND
-        canvas.drawLine(x1, y1, x2, y2, paint)
+
+        canvas.drawLine(
+            x1, y1, x2, y2, paint
+        )
     }
 
     private fun oval(
@@ -55,7 +87,10 @@ class MaizeGrowthView(context: Context) : View(context) {
         paint.isAntiAlias = true
         paint.color = shade
         paint.style = Paint.Style.FILL
-        canvas.drawOval(left, top, right, bottom, paint)
+
+        canvas.drawOval(
+            left, top, right, bottom, paint
+        )
     }
 
     private fun leaf(
@@ -72,6 +107,7 @@ class MaizeGrowthView(context: Context) : View(context) {
 
         val path = Path().apply {
             moveTo(x, y)
+
             cubicTo(
                 x + length * side * 0.20f,
                 y - rise * 0.85f,
@@ -80,6 +116,7 @@ class MaizeGrowthView(context: Context) : View(context) {
                 tipX,
                 tipY
             )
+
             cubicTo(
                 tipX - length * side * 0.35f,
                 tipY + 24f,
@@ -88,6 +125,7 @@ class MaizeGrowthView(context: Context) : View(context) {
                 x,
                 y
             )
+
             close()
         }
 
@@ -95,6 +133,7 @@ class MaizeGrowthView(context: Context) : View(context) {
         paint.isAntiAlias = true
         paint.color = shade
         paint.style = Paint.Style.FILL
+
         canvas.drawPath(path, paint)
 
         line(
@@ -159,31 +198,43 @@ class MaizeGrowthView(context: Context) : View(context) {
 
         setMeasuredDimension(
             View.MeasureSpec.getSize(widthMeasureSpec),
-            resolveSize(desiredHeight, heightMeasureSpec)
+            resolveSize(
+                desiredHeight,
+                heightMeasureSpec
+            )
         )
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val width = width.toFloat()
-        val height = height.toFloat()
+        val viewWidth = width.toFloat()
+        val viewHeight = height.toFloat()
 
-        if (width <= 0f || height <= 0f) return
+        if (
+            viewWidth <= 0f ||
+            viewHeight <= 0f
+        ) return
 
-        val scale = min(width / 360f, height / 300f)
+        val scale = min(
+            viewWidth / 360f,
+            viewHeight / 300f
+        )
 
         canvas.save()
+
         canvas.translate(
-            (width - 360f * scale) / 2f,
-            (height - 300f * scale) / 2f
+            (viewWidth - 360f * scale) / 2f,
+            (viewHeight - 300f * scale) / 2f
         )
+
         canvas.scale(scale, scale)
 
         // SKY BACKGROUND
 
         paint.reset()
         paint.isAntiAlias = true
+
         paint.shader = LinearGradient(
             0f,
             0f,
@@ -193,42 +244,57 @@ class MaizeGrowthView(context: Context) : View(context) {
             color("#F9FCF3"),
             Shader.TileMode.CLAMP
         )
+
         canvas.drawRoundRect(
-            0f, 0f, 360f, 300f,
-            20f, 20f, paint
+            0f, 0f,
+            360f, 300f,
+            20f, 20f,
+            paint
         )
+
         paint.shader = null
 
         // SUN
 
         oval(
             canvas,
-            275f, 24f, 316f, 65f,
+            275f, 24f,
+            316f, 65f,
             color("#FFE6A0")
         )
 
         // SOIL
 
         paint.color = color("#79553C")
+
         canvas.drawRoundRect(
-            0f, 212f, 360f, 300f,
-            18f, 18f, paint
+            0f, 212f,
+            360f, 300f,
+            18f, 18f,
+            paint
         )
 
         paint.color = color("#A47B53")
+
         canvas.drawRect(
-            0f, 212f, 360f, 223f, paint
+            0f, 212f,
+            360f, 223f,
+            paint
         )
 
         // SOIL TEXTURE
 
         for (i in 0 until 24) {
-            val x = ((i * 83 + 17) % 345).toFloat()
-            val y = (231 + (i * 29 % 61)).toFloat()
+            val x =
+                ((i * 83 + 17) % 345).toFloat()
+
+            val y =
+                (231 + (i * 29 % 61)).toFloat()
 
             oval(
                 canvas,
-                x, y, x + 3f, y + 2f,
+                x, y,
+                x + 3f, y + 2f,
                 color("#C29A70")
             )
         }
@@ -238,7 +304,7 @@ class MaizeGrowthView(context: Context) : View(context) {
         val centerX = 180f
         val soilY = 214f
 
-        // SEED
+        // MAIZE SEED
 
         oval(
             canvas,
@@ -279,7 +345,7 @@ class MaizeGrowthView(context: Context) : View(context) {
             )
         }
 
-        // EMERGING SHOOT
+        // PLANT HEIGHT
 
         val plantHeight = when {
             progress < 5 -> 12f
@@ -317,7 +383,7 @@ class MaizeGrowthView(context: Context) : View(context) {
             6f
         )
 
-        // LEAVES
+        // MAIZE LEAVES
 
         val leafCount = when {
             progress < 5 -> 0
@@ -329,10 +395,14 @@ class MaizeGrowthView(context: Context) : View(context) {
         }
 
         for (i in 0 until leafCount) {
-            val fraction = (i + 1f) / (leafCount + 1f)
-            val y = soilY - plantHeight * fraction
+            val fraction =
+                (i + 1f) / (leafCount + 1f)
 
-            val side = if (i % 2 == 0) -1f else 1f
+            val y =
+                soilY - plantHeight * fraction
+
+            val side =
+                if (i % 2 == 0) -1f else 1f
 
             val length = when {
                 progress < 16 -> 20f
@@ -364,7 +434,7 @@ class MaizeGrowthView(context: Context) : View(context) {
                     centerX,
                     topY + 10f,
                     centerX + i * 9f,
-                    topY - 21f + kotlin.math.abs(i) * 4f,
+                    topY - 21f + abs(i) * 4f,
                     color("#B49B4E"),
                     2f
                 )
@@ -381,23 +451,30 @@ class MaizeGrowthView(context: Context) : View(context) {
             }
 
             canvas.save()
-            canvas.translate(centerX + 18f, soilY - plantHeight * 0.52f)
+
+            canvas.translate(
+                centerX + 18f,
+                soilY - plantHeight * 0.52f
+            )
+
             canvas.rotate(-24f)
             canvas.scale(cobSize, cobSize)
 
-            // HUSK
+            // GREEN HUSK
 
             oval(
                 canvas,
-                -13f, -24f, 13f, 29f,
+                -13f, -24f,
+                13f, 29f,
                 color("#4E9D45")
             )
 
-            // COB
+            // MAIZE COB
 
             oval(
                 canvas,
-                -9f, -20f, 9f, 17f,
+                -9f, -20f,
+                9f, 17f,
                 if (progress < 80) {
                     color("#F2D977")
                 } else {
@@ -405,7 +482,7 @@ class MaizeGrowthView(context: Context) : View(context) {
                 }
             )
 
-            // KERNEL DETAILS
+            // MAIZE KERNELS
 
             for (row in 0 until 6) {
                 for (column in -1..1) {
@@ -420,7 +497,7 @@ class MaizeGrowthView(context: Context) : View(context) {
                 }
             }
 
-            // SILKS
+            // MAIZE SILKS
 
             if (progress < 80) {
                 for (i in -2..2) {
@@ -439,18 +516,16 @@ class MaizeGrowthView(context: Context) : View(context) {
             canvas.restore()
         }
 
-        // MATURITY COLOUR CHANGES
+        // MATURE PLANT COLOURS
 
         if (progress >= 90) {
-            val golden = color("#BDAA56")
-
             line(
                 canvas,
                 centerX,
                 soilY,
                 centerX,
                 topY,
-                golden,
+                color("#BDAA56"),
                 3f
             )
 
@@ -465,9 +540,16 @@ class MaizeGrowthView(context: Context) : View(context) {
             )
         }
 
-        // SMALL GROUND GRASS
+        // GROUND GRASS
 
-        for (x in listOf(34f, 64f, 291f, 324f)) {
+        for (
+            x in listOf(
+                34f,
+                64f,
+                291f,
+                324f
+            )
+        ) {
             line(
                 canvas,
                 x,
