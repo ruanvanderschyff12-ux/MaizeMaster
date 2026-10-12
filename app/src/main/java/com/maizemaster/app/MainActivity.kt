@@ -217,7 +217,7 @@ class MainActivity : Activity() {
 
         // Full-width, square-cornered banner.
         val header = ImageView(this).apply {
-            setImageResource(R.drawable.maizemaster_logo)
+            setImageResource(R.drawable.maizemaster_realistic_banner)
             scaleType = ImageView.ScaleType.CENTER_CROP
             adjustViewBounds = false
             contentDescription = "MaizeMaster - Your maize farm at a glance"
