@@ -1,7 +1,9 @@
+
 package com.maizemaster.app
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -11,8 +13,11 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.View
 import android.widget.*
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 class MainActivity : Activity() {
 
@@ -78,9 +83,9 @@ class MainActivity : Activity() {
             InputType.TYPE_CLASS_NUMBER or
                 InputType.TYPE_NUMBER_FLAG_DECIMAL
         } else {
-            InputType.TYPE_CLASS_TEXT
+            InputType.TYPE_CLASS_TEXT or
+                InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         }
-
         textSize = 15f
         setTextColor(ink)
         setSingleLine(true)
@@ -109,10 +114,10 @@ class MainActivity : Activity() {
         label: String,
         value: String
     ): LinearLayout = vertical().apply {
-        setPadding(dp(13), dp(12), dp(13), dp(12))
+        setPadding(dp(10), dp(12), dp(8), dp(12))
         background = bg(pale, 14)
-        addView(text(label, 12f, muted))
-        addView(text(value, 21f, forest, true))
+        addView(text(label, 11f, muted))
+        addView(text(value, 18f, forest, true))
     }
 
     private fun fmt(value: Double): String =
@@ -122,11 +127,130 @@ class MainActivity : Activity() {
         Toast.makeText(this, value, Toast.LENGTH_LONG).show()
     }
 
+    private fun dateFormat(): SimpleDateFormat =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+            isLenient = false
+        }
+
+    private fun daysSince(date: String): Long? {
+        return try {
+            val planted = dateFormat().parse(date) ?: return null
+            val today = dateFormat().parse(
+                dateFormat().format(System.currentTimeMillis())
+            ) ?: return null
+
+            TimeUnit.MILLISECONDS.toDays(
+                today.time - planted.time
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun growthStages(): Array<String> = arrayOf(
+        "Not planted",
+        "Germination (VE)",
+        "Seedling (V1-V3)",
+        "Vegetative growth (V4-V12)",
+        "Late vegetative growth (V13-VT)",
+        "Tasseling (VT)",
+        "Silking (R1)",
+        "Blister (R2)",
+        "Milk (R3)",
+        "Dough (R4)",
+        "Dent (R5)",
+        "Physiological maturity (R6)",
+        "Harvested"
+    )
+
+    private fun stageSymbol(stage: String): String {
+        return when {
+            stage.contains("Germination") -> "🌱"
+            stage.contains("Seedling") -> "🌱"
+            stage.contains("Vegetative") -> "🌿"
+            stage.contains("Tasseling") -> "🌽"
+            stage.contains("Silking") -> "🌽"
+            stage.contains("Blister") -> "🌽"
+            stage.contains("Milk") -> "🌽"
+            stage.contains("Dough") -> "🌽"
+            stage.contains("Dent") -> "🌽"
+            stage.contains("maturity") -> "🌽"
+            stage == "Harvested" -> "🚜"
+            else -> "🌾"
+        }
+    }
+
+    private fun growthAdvice(stage: String): String {
+        return when {
+            stage.contains("Germination") ->
+                "Check soil moisture, crusting and seed emergence. Avoid waterlogging."
+            stage.contains("Seedling") ->
+                "Inspect plant population, early pests, weeds and nutrient symptoms."
+            stage.contains("Vegetative") ->
+                "Monitor soil moisture, leaf colour, weeds, pests and nutrient supply."
+            stage.contains("Tasseling") ->
+                "Water stress and extreme heat can reduce pollination potential."
+            stage.contains("Silking") ->
+                "Protect against moisture stress. Check silk emergence and pollination."
+            stage.contains("Blister") ->
+                "Monitor moisture, disease and early kernel development."
+            stage.contains("Milk") ->
+                "Check grain filling, moisture availability and leaf health."
+            stage.contains("Dough") ->
+                "Monitor grain filling, lodging and crop health."
+            stage.contains("Dent") ->
+                "Inspect grain development, lodging and harvest readiness."
+            stage.contains("maturity") ->
+                "Check grain moisture and drying conditions before harvesting."
+            stage == "Harvested" ->
+                "Record harvested hectares and actual tons."
+            else ->
+                "Select the observed growth stage to see field guidance."
+        }
+    }
+
+    private fun growthProgress(stage: String): Int {
+        val stages = growthStages()
+        val index = stages.indexOf(stage)
+        if (index < 0) return 0
+        return (index * 100 / (stages.size - 1)).coerceIn(0, 100)
+    }
+
+    private fun pickDate(
+        current: String,
+        onSelected: (String) -> Unit
+    ) {
+        val calendar = Calendar.getInstance()
+
+        try {
+            if (current.isNotBlank()) {
+                val parsed = dateFormat().parse(current)
+                if (parsed != null) calendar.time = parsed
+            }
+        } catch (_: Exception) {}
+
+        DatePickerDialog(
+            this,
+            { _, year, month, day ->
+                onSelected(
+                    String.format(
+                        Locale.US,
+                        "%04d-%02d-%02d",
+                        year,
+                        month + 1,
+                        day
+                    )
+                )
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
     override fun onResume() {
         super.onResume()
-        if (::refreshList.isInitialized) {
-            refreshList()
-        }
+        if (::refreshList.isInitialized) refreshList()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -394,7 +518,7 @@ class MainActivity : Activity() {
                 ) {}
             }
 
-        // READ INPUTS
+        // READ FIELD INPUTS
 
         fun readField(id: String): SavedField? {
             val name = nameInput.text.toString().trim()
@@ -567,6 +691,160 @@ class MainActivity : Activity() {
             dialog.show()
         }
 
+        // MAIZE GROWTH TRACKER
+
+        fun editGrowth(field: SavedField) {
+            val dialogLayout = vertical().apply {
+                setPadding(dp(22), dp(12), dp(22), dp(8))
+            }
+
+            dialogLayout.addView(
+                text("Planting date", 14f, forest, true)
+            )
+
+            var selectedDate = field.plantingDate
+
+            val dateButton = button(
+                if (selectedDate.isBlank()) {
+                    "Select planting date"
+                } else {
+                    "Planted: $selectedDate"
+                },
+                true
+            )
+
+            dateButton.setOnClickListener {
+                pickDate(selectedDate) { date ->
+                    selectedDate = date
+                    dateButton.text = "Planted: $date"
+                }
+            }
+
+            dialogLayout.addView(dateButton)
+
+            val maturityInput = input(
+                "Expected days to maturity"
+            )
+
+            if (field.maturityDays > 0) {
+                maturityInput.setText(field.maturityDays.toString())
+            }
+
+            dialogLayout.addView(maturityInput)
+
+            dialogLayout.addView(
+                text(
+                    "Observed maize growth stage",
+                    14f,
+                    forest,
+                    true
+                )
+            )
+
+            val stages = growthStages()
+
+            val stageSelector = Spinner(this).apply {
+                adapter = ArrayAdapter(
+                    this@MainActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    stages
+                )
+                setSelection(
+                    stages.indexOf(field.growthStage)
+                        .coerceAtLeast(0)
+                )
+            }
+
+            dialogLayout.addView(stageSelector)
+
+            dialogLayout.addView(
+                text(
+                    "Select the stage you actually see in your field.",
+                    12f,
+                    muted
+                )
+            )
+
+            val notesInput = input(
+                "Growth observations / notes",
+                false
+            ).apply {
+                setSingleLine(false)
+                minLines = 3
+                inputType =
+                    InputType.TYPE_CLASS_TEXT or
+                    InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                setText(field.growthNotes)
+            }
+
+            dialogLayout.addView(notesInput)
+
+            val dialogScroll = ScrollView(this)
+            dialogScroll.addView(dialogLayout)
+
+            val dialog = AlertDialog.Builder(this)
+                .setTitle("🌽 Growth tracker: ${field.name}")
+                .setView(dialogScroll)
+                .setPositiveButton("Save growth", null)
+                .setNegativeButton("Cancel", null)
+                .create()
+
+            dialog.setOnShowListener {
+                dialog.getButton(
+                    AlertDialog.BUTTON_POSITIVE
+                ).setOnClickListener {
+                    val maturityText =
+                        maturityInput.text.toString().trim()
+
+                    val maturity = if (maturityText.isBlank()) {
+                        0
+                    } else {
+                        maturityText.toIntOrNull()
+                    }
+
+                    val age = if (selectedDate.isBlank()) {
+                        null
+                    } else {
+                        daysSince(selectedDate)
+                    }
+
+                    if (
+                        maturity == null ||
+                        maturity < 0 ||
+                        maturity > 1000
+                    ) {
+                        message("Enter valid maturity days (0-1000).")
+                    } else if (
+                        selectedDate.isNotBlank() &&
+                        (age == null || age < 0)
+                    ) {
+                        message("Choose a valid planting date, not in the future.")
+                    } else {
+                        field.plantingDate = selectedDate
+                        field.maturityDays = maturity
+                        field.growthStage =
+                            stageSelector.selectedItem.toString()
+                        field.growthNotes =
+                            notesInput.text.toString().trim()
+                        field.growthObservedDate =
+                            dateFormat().format(
+                                System.currentTimeMillis()
+                            )
+
+                        if (storage.updateField(field)) {
+                            dialog.dismiss()
+                            refreshList()
+                            message("Growth information saved.")
+                        } else {
+                            message("Could not save growth information.")
+                        }
+                    }
+                }
+            }
+
+            dialog.show()
+        }
+
         // REFRESH DASHBOARD AND FIELD CARDS
 
         refreshList = {
@@ -644,8 +922,302 @@ class MainActivity : Activity() {
                     }
                 )
 
-                // MAIZE GROWTH PICTURE
+                // GROWTH STAGE DISPLAY
 
-                if (field.growthStage.isNotBlank()) {
-                    item.addView(
-                        Mai
+                val growthCard = vertical().apply {
+                    setPadding(
+                        dp(12), dp(12), dp(12), dp(12)
+                    )
+                    background = bg(Color.WHITE, 12)
+                    layoutParams =
+                        LinearLayout.LayoutParams(-1, -2).apply {
+                            bottomMargin = dp(12)
+                        }
+                }
+
+                growthCard.addView(
+                    text("🌱 Maize growth", 16f, forest, true)
+                )
+
+                val stage = field.growthStage
+
+                if (
+                    stage.isNotBlank() &&
+                    stage != "Not planted"
+                ) {
+                    growthCard.addView(
+                        text(
+                            "${stageSymbol(stage)} $stage",
+                            17f,
+                            green,
+                            true
+                        ).apply {
+                            setPadding(0, dp(10), 0, dp(8))
+                        }
+                    )
+
+                    growthCard.addView(
+                        ProgressBar(
+                            this,
+                            null,
+                            android.R.attr.progressBarStyleHorizontal
+                        ).apply {
+                            max = 100
+                            progress = growthProgress(stage)
+                            progressTintList =
+                                ColorStateList.valueOf(green)
+                        }
+                    )
+
+                    growthCard.addView(
+                        text(
+                            growthAdvice(stage),
+                            13f,
+                            ink
+                        ).apply {
+                            setPadding(0, dp(10), 0, dp(5))
+                        }
+                    )
+                } else {
+                    growthCard.addView(
+                        text(
+                            "Growth stage not recorded yet.",
+                            13f,
+                            muted
+                        ).apply {
+                            setPadding(0, dp(8), 0, dp(8))
+                        }
+                    )
+                }
+
+                if (field.plantingDate.isNotBlank()) {
+                    val age = daysSince(field.plantingDate)
+
+                    growthCard.addView(
+                        text(
+                            "Planted: ${field.plantingDate}" +
+                            if (age != null && age >= 0) {
+                                "\nDays since planting: $age"
+                            } else {
+                                ""
+                            },
+                            13f,
+                            ink
+                        )
+                    )
+
+                    if (field.maturityDays > 0) {
+                        val remaining =
+                            if (age != null) {
+                                (field.maturityDays.toLong() - age)
+                                    .coerceAtLeast(0)
+                            } else {
+                                null
+                            }
+
+                        growthCard.addView(
+                            text(
+                                "Expected maturity duration: " +
+                                "${field.maturityDays} days" +
+                                if (remaining != null) {
+                                    "\nApproximate days remaining: $remaining"
+                                } else {
+                                    ""
+                                },
+                                13f,
+                                ink
+                            )
+                        )
+                    }
+                }
+
+                if (field.growthNotes.isNotBlank()) {
+                    growthCard.addView(
+                        text(
+                            "Notes: ${field.growthNotes}",
+                            13f,
+                            ink
+                        ).apply {
+                            setPadding(0, dp(8), 0, 0)
+                        }
+                    )
+                }
+
+                if (field.growthObservedDate.isNotBlank()) {
+                    growthCard.addView(
+                        text(
+                            "Last observation: ${field.growthObservedDate}",
+                            12f,
+                            muted
+                        ).apply {
+                            setPadding(0, dp(8), 0, 0)
+                        }
+                    )
+                }
+
+                item.addView(growthCard)
+
+                item.addView(
+                    button("🌱 Update maize growth").apply {
+                        setOnClickListener {
+                            editGrowth(field)
+                        }
+                    }
+                )
+
+                item.addView(
+                    button("🚜 Record harvest").apply {
+                        setOnClickListener {
+                            recordHarvest(field)
+                        }
+                    }
+                )
+
+                item.addView(
+                    button("✏️ Edit field", true).apply {
+                        setOnClickListener {
+                            openField(field)
+                        }
+                    }
+                )
+
+                item.addView(
+                    button("🗑️ Delete field", true).apply {
+                        setOnClickListener {
+                            AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Delete field?")
+                                .setMessage(
+                                    "Delete ${field.name} and its saved records?"
+                                )
+                                .setPositiveButton("Delete") { _, _ ->
+                                    if (storage.deleteField(field.id)) {
+                                        if (editingId == field.id) {
+                                            editingId = null
+                                            editingLabel.text =
+                                                "Creating a new field"
+                                        }
+                                        refreshList()
+                                    } else {
+                                        message("Could not delete field.")
+                                    }
+                                }
+                                .setNegativeButton("Cancel", null)
+                                .show()
+                        }
+                    }
+                )
+
+                fieldList.addView(item)
+            }
+        }
+
+        // CALCULATE BUTTON
+
+        calculateButton.setOnClickListener {
+            val field = readField(
+                editingId ?: UUID.randomUUID().toString()
+            )
+
+            if (field != null) {
+                showCalculation(field)
+            }
+        }
+
+        // SAVE NEW FIELD
+
+        saveButton.setOnClickListener {
+            val field = readField(UUID.randomUUID().toString())
+
+            if (field != null) {
+                if (storage.addField(field)) {
+                    editingId = field.id
+                    editingLabel.text = "Editing: ${field.name}"
+                    showCalculation(field)
+                    refreshList()
+                    message("Field saved successfully.")
+                } else {
+                    message("Could not save field.")
+                }
+            }
+        }
+
+        // UPDATE FIELD
+
+        updateButton.setOnClickListener {
+            val id = editingId
+
+            if (id == null) {
+                message("Select a saved field to update.")
+            } else {
+                val original = storage.loadFields()
+                    .firstOrNull { it.id == id }
+
+                val updated = readField(id)
+
+                if (original == null) {
+                    message("Saved field not found.")
+                } else if (updated != null) {
+                    updated.harvestedHectares =
+                        original.harvestedHectares
+                    updated.harvestedTons =
+                        original.harvestedTons
+                    updated.plantingDate =
+                        original.plantingDate
+                    updated.maturityDays =
+                        original.maturityDays
+                    updated.growthStage =
+                        original.growthStage
+                    updated.growthNotes =
+                        original.growthNotes
+                    updated.growthObservedDate =
+                        original.growthObservedDate
+
+                    if (
+                        updated.harvestedHectares >
+                        updated.hectares() + 0.000001
+                    ) {
+                        message(
+                            "New field area is smaller than the recorded harvested area."
+                        )
+                    } else if (storage.updateField(updated)) {
+                        showCalculation(updated)
+                        refreshList()
+                        message("Field updated successfully.")
+                    } else {
+                        message("Could not update field.")
+                    }
+                }
+            }
+        }
+
+        // CLEAR / NEW FIELD
+
+        newButton.setOnClickListener {
+            editingId = null
+            nameInput.setText("")
+            widthInput.setText("")
+            lengthInput.setText("")
+            rowInput.setText("")
+            plantInput.setText("")
+            yieldInput.setText("")
+            shapeSelector.setSelection(0)
+            maizeSelector.setSelection(0)
+
+            editingLabel.text = "Creating a new field"
+            result.text =
+                "Enter your field measurements to calculate."
+
+            fieldView.fieldShape = "Rectangle"
+            fieldView.fieldWidth = 200f
+            fieldView.fieldLength = 300f
+            fieldView.rowSpacing = 0.75f
+
+            message("Ready to create a new field.")
+            scroll.smoothScrollTo(0, 0)
+        }
+
+        // INITIAL DASHBOARD
+
+        refreshList()
+    }
+}
