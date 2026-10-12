@@ -501,6 +501,7 @@ class MainActivity : Activity() {
             fieldView.fieldLength = field.length.toFloat()
             fieldView.rowSpacing = field.rowSpacing.toFloat()
             fieldView.fieldShape = field.shape
+            fieldView.growthDays = daysSince(field.plantingDate)?.toInt()?.coerceAtLeast(0) ?: 0
 
             result.text =
                 "🌽 ${field.maizeVariety}\n\n" +
