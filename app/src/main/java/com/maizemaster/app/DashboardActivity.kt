@@ -70,7 +70,6 @@ class DashboardActivity : Activity() {
         val root = column().apply { setBackgroundColor(light) }
         val scroll = ScrollView(this).apply {
             isFillViewport = true
-            fillViewport = true
         }
         val body = column()
         scroll.addView(body)
