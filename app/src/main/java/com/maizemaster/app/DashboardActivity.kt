@@ -53,6 +53,24 @@ class DashboardActivity : Activity() {
             .setMessage("This feature is being developed. Your current field management and weather tools are available now.")
             .setPositiveButton("OK", null).show()
     }
+    private fun showGrowth() {
+        val fields = storage.loadFields()
+        val message = if (fields.isEmpty()) "Save a field first to track maize growth." else fields.joinToString("\n\n") { field ->
+            val growth = if (field.plantingDate.isNotBlank() && field.maturityDays > 0)
+                MaizeGrowthCalculator.calculate(field.plantingDate, field.maturityDays).stage
+            else "Set planting date and maturity days in My Fields"
+            "🌽 ${field.name}\nGrowth: $growth\nPlanted: ${field.plantingDate.ifBlank { "Not set" }}"
+        }
+        AlertDialog.Builder(this).setTitle("🌱 Maize Growth Stages")
+            .setMessage(message).setPositiveButton("OK", null).show()
+    }
+
+    private fun showKnowledge() {
+        AlertDialog.Builder(this).setTitle("📖 Maize Farming Knowledge")
+            .setMessage("PLANTING\nPlant in suitable soil moisture and temperature. Check seed depth, row spacing and plant population.\n\nGROWTH\nScout for uneven emergence, weeds, nutrient deficiencies and leaf damage.\n\nFLOWERING\nHeat and water stress during tasseling and silking can reduce kernel set.\n\nHARVEST\nCheck grain moisture and storage conditions before harvesting.\n\nThese are general guidelines; use local agronomic advice for your field.")
+            .setPositiveButton("OK", null).show()
+    }
+
     private fun tile(icon: String, title: String, description: String, action: () -> Unit): LinearLayout =
         panel().apply {
             minimumHeight = dp(116)
@@ -109,9 +127,9 @@ class DashboardActivity : Activity() {
         val items = listOf(
             Triple("🗺️", "Field Designer", "Design your field") to { openFields() },
             Triple("🌤️", "Weather", "Forecast & risks") to { openWeather() },
-            Triple("🌱", "Growth Stages", "Follow crop growth") to { unavailable("Growth Stages") },
+            Triple("🌱", "Growth Stages", "Follow crop growth") to { showGrowth() },
             Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields() },
-            Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { unavailable("Pests & Diseases") },
+            Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { DiseaseGuide.show(this) },
             Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openFields() }
         )
         for (i in 0 until 3) {
@@ -141,7 +159,7 @@ class DashboardActivity : Activity() {
             Triple("⌂", "Home", { scroll.smoothScrollTo(0, 0) }),
             Triple("🌱", "My Fields", { openFields() }),
             Triple("☁", "Weather", { openWeather() }),
-            Triple("📖", "Knowledge", { unavailable("Knowledge") })
+            Triple("📖", "Knowledge", { showKnowledge() })
         )
         for ((symbol, name, action) in tabs) {
             val tab = column().apply {
