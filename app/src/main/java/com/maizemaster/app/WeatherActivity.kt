@@ -33,7 +33,8 @@ class WeatherActivity : Activity() {
     private lateinit var result: TextView
 
     private lateinit var fields: List<SavedField>
-    private val cache by lazy { getSharedPreferences("maizemaster_weather_cache", MODE_PRIVATE) }\n    private var latestRequest = 0L
+    private val cache by lazy { getSharedPreferences("maizemaster_weather_cache", MODE_PRIVATE) }
+    private var latestRequest = 0L
 
 
     private val green = Color.rgb(24, 85, 49)
@@ -939,6 +940,7 @@ class WeatherActivity : Activity() {
 
         val position = coordinates() ?: return
         val stage = growthStage(field)
+        val requestId = ++latestRequest
 
         result.text =
             "Loading weather for ${field.name}..."
