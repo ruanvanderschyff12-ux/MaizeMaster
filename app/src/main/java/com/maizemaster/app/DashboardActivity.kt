@@ -197,6 +197,7 @@ class DashboardActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::summary.isInitialized) refresh()
+        WeatherAutoSync.refresh(this)
     }
 
     private fun refresh() {
