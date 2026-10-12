@@ -209,7 +209,7 @@ class MainActivity : Activity() {
         }
 
         val layout = vertical().apply {
-            setPadding(dp(16), dp(16), dp(16), dp(28))
+            setPadding(0, 0, 0, dp(28))
         }
 
         scroll.addView(layout)
@@ -244,6 +244,12 @@ class MainActivity : Activity() {
         )
         layout.addView(header)
 
+        // Keep the logo banner edge-to-edge; inset the content below it.
+        val content = vertical().apply {
+            setPadding(dp(16), dp(16), dp(16), 0)
+        }
+        layout.addView(content)
+
         // FARM OVERVIEW
 
         val overview = card()
@@ -251,7 +257,7 @@ class MainActivity : Activity() {
 
         val overviewText = text("", 15f, forest, true)
         overview.addView(overviewText)
-        layout.addView(overview)
+        content.addView(overview)
 
         // WEATHER
 
@@ -278,7 +284,7 @@ class MainActivity : Activity() {
                 }
             }
         )
-        layout.addView(weatherCard)
+        content.addView(weatherCard)
 
         // FIELD DESIGNER
 
@@ -320,7 +326,7 @@ class MainActivity : Activity() {
 
         fieldCard.addView(widthInput)
         fieldCard.addView(lengthInput)
-        layout.addView(fieldCard)
+        content.addView(fieldCard)
 
         // PLANTING DETAILS
 
@@ -354,7 +360,7 @@ class MainActivity : Activity() {
 
         val yieldInput = input("Expected tons per hectare")
         plantingCard.addView(yieldInput)
-        layout.addView(plantingCard)
+        content.addView(plantingCard)
 
         // HARVEST ESTIMATE
 
@@ -372,7 +378,7 @@ class MainActivity : Activity() {
         val calculateButton = button("Calculate harvest")
         estimateCard.addView(calculateButton)
         estimateCard.addView(result)
-        layout.addView(estimateCard)
+        content.addView(estimateCard)
 
         // FIELD MANAGEMENT
 
@@ -402,7 +408,7 @@ class MainActivity : Activity() {
         management.addView(saveButton)
         management.addView(updateButton)
         management.addView(newButton)
-        layout.addView(management)
+        content.addView(management)
 
         // SAVED FIELDS
 
@@ -413,7 +419,7 @@ class MainActivity : Activity() {
 
         val fieldList = vertical()
         savedCard.addView(fieldList)
-        layout.addView(savedCard)
+        content.addView(savedCard)
 
         // FIELD SHAPE
 
