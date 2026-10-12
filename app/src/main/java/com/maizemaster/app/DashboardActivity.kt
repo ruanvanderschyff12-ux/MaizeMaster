@@ -1,285 +1,190 @@
 package com.maizemaster.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.view.ViewGroup
+import android.view.Gravity
+import android.view.View
 import android.widget.*
 import java.util.Locale
 
 class DashboardActivity : Activity() {
-
-    private val darkGreen = Color.rgb(24, 86, 48)
-    private val green = Color.rgb(43, 133, 72)
-    private val paleGreen = Color.rgb(231, 244, 232)
-    private val backgroundColor = Color.rgb(246, 249, 245)
-
-    private lateinit var storage: FieldStorage
+    private val dark = Color.rgb(8, 65, 40)
+    private val green = Color.rgb(28, 137, 57)
+    private val light = Color.rgb(246, 249, 246)
+    private val storage by lazy { FieldStorage(this) }
+    private lateinit var fieldArea: LinearLayout
     private lateinit var summary: TextView
-    private lateinit var fieldContainer: LinearLayout
 
-    private fun rounded(color: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = 28f
-        }
+    private fun dp(v: Int) = (v * resources.displayMetrics.density + .5f).toInt()
+    private fun shape(color: Int, radius: Int = 15) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
     }
-
-    private fun text(
-        value: String,
-        size: Float = 16f,
-        bold: Boolean = false,
-        color: Int = darkGreen
-    ): TextView {
-        return TextView(this).apply {
-            this.text = value
+    private fun label(s: String, size: Float = 15f, bold: Boolean = false, color: Int = dark) =
+        TextView(this).apply {
+            text = s
             textSize = size
             setTextColor(color)
             if (bold) setTypeface(null, Typeface.BOLD)
-            setPadding(12, 12, 12, 12)
         }
+    private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+    private fun panel() = column().apply {
+        background = shape(Color.WHITE)
+        elevation = dp(3).toFloat()
+        setPadding(dp(16), dp(15), dp(16), dp(15))
     }
-
-    private fun card(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(22, 20, 22, 20)
-            background = rounded(Color.WHITE)
-            elevation = 4f
-
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 12, 0, 12)
-            }
-        }
+    private fun button(s: String, action: () -> Unit) = Button(this).apply {
+        text = s
+        isAllCaps = false
+        textSize = 14f
+        setTextColor(Color.WHITE)
+        background = shape(green, 13)
+        setOnClickListener { action() }
     }
-
-    private fun button(label: String, action: () -> Unit): Button {
-        return Button(this).apply {
-            text = label
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            background = rounded(green)
+    private fun openFields() = startActivity(Intent(this, MainActivity::class.java))
+    private fun openWeather() = startActivity(Intent(this, WeatherActivity::class.java))
+    private fun unavailable(title: String) {
+        AlertDialog.Builder(this).setTitle(title)
+            .setMessage("This feature is being developed. Your current field management and weather tools are available now.")
+            .setPositiveButton("OK", null).show()
+    }
+    private fun tile(icon: String, title: String, description: String, action: () -> Unit): LinearLayout =
+        panel().apply {
+            minimumHeight = dp(116)
+            addView(label(icon, 27f))
+            addView(label(title, 15f, true).apply { setPadding(0, dp(6), 0, dp(3)) })
+            addView(label(description, 11f, false, Color.DKGRAY))
             setOnClickListener { action() }
         }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = dark
+        window.navigationBarColor = dark
 
-        storage = FieldStorage(this)
-        window.statusBarColor = darkGreen
-
+        val root = column().apply { setBackgroundColor(light) }
         val scroll = ScrollView(this).apply {
-            setBackgroundColor(backgroundColor)
+            isFillViewport = true
+            fillViewport = true
         }
+        val body = column()
+        scroll.addView(body)
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 40)
-        }
-
-        val logo = ImageView(this).apply {
+        body.addView(ImageView(this).apply {
             setImageResource(R.drawable.maizemaster_realistic_banner)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            adjustViewBounds = true
-            contentDescription = "MaizeMaster - Plan, Grow, Monitor, Harvest"
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, 12)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = "MaizeMaster maize field banner"
+            layoutParams = LinearLayout.LayoutParams(-1, dp(160))
+        })
+
+        val content = column().apply {
+            setPadding(dp(14), dp(14), dp(14), dp(18))
+        }
+        body.addView(content)
+
+        val weather = panel()
+        weather.addView(label("☀️  Weather & maize risks", 19f, true))
+        weather.addView(label("See your local forecast and how conditions can affect maize.", 13f).apply {
+            setPadding(0, dp(7), 0, dp(9))
+        })
+        weather.addView(button("View live weather  ›") { openWeather() })
+        content.addView(weather, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+
+        val field = panel().apply { background = shape(Color.rgb(226, 242, 226)) }
+        field.addView(label("🌱  My Field", 21f, true))
+        summary = label("Loading saved fields...", 14f)
+        summary.setPadding(0, dp(10), 0, dp(10))
+        field.addView(summary)
+        field.addView(button("View My Fields  ›") { openFields() })
+        content.addView(field, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(17) })
+
+        content.addView(label("Explore MaizeMaster", 20f, true).apply {
+            setPadding(dp(3), 0, 0, dp(12))
+        })
+
+        val items = listOf(
+            Triple("🗺️", "Field Designer", "Design your field") to { openFields() },
+            Triple("🌤️", "Weather", "Forecast & risks") to { openWeather() },
+            Triple("🌱", "Growth Stages", "Follow crop growth") to { unavailable("Growth Stages") },
+            Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields() },
+            Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { unavailable("Pests & Diseases") },
+            Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openFields() }
+        )
+        for (i in 0 until 3) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            for (j in 0 until 2) {
+                val item = items[i * 2 + j]
+                row.addView(tile(item.first.first, item.first.second, item.first.third, item.second),
+                    LinearLayout.LayoutParams(0, -2, 1f).apply {
+                        if (j == 0) rightMargin = dp(6) else leftMargin = dp(6)
+                    })
             }
+            content.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         }
 
-        layout.addView(logo)
+        fieldArea = column()
+        content.addView(label("Saved Fields", 19f, true).apply { setPadding(0, dp(6), 0, dp(8)) })
+        content.addView(fieldArea)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        layout.addView(
-            text("🌾 Farm Overview", 23f, true)
-        )
-
-        val overviewCard = card().apply {
-            background = rounded(paleGreen)
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = shape(dark, 18)
+            setPadding(dp(4), dp(5), dp(4), dp(5))
         }
-
-        summary = text("Loading your fields...", 17f, true)
-        overviewCard.addView(summary)
-        layout.addView(overviewCard)
-
-        layout.addView(
-            text("🚜 Quick Actions", 23f, true)
+        val tabs = listOf(
+            Triple("⌂", "Home", { scroll.smoothScrollTo(0, 0) }),
+            Triple("🌱", "My Fields", { openFields() }),
+            Triple("☁", "Weather", { openWeather() }),
+            Triple("📖", "Knowledge", { unavailable("Knowledge") })
         )
-
-        val actions = card()
-
-        actions.addView(
-            button("🌱 MANAGE MY FIELDS") {
-                startActivity(
-                    Intent(this, MainActivity::class.java)
-                )
+        for ((symbol, name, action) in tabs) {
+            val tab = column().apply {
+                gravity = Gravity.CENTER
+                background = if (name == "Home") shape(green, 12) else null
+                setPadding(dp(3), dp(5), dp(3), dp(5))
+                addView(label(symbol, 22f, false, Color.WHITE))
+                addView(label(name, 11f, false, Color.WHITE))
+                setOnClickListener { action() }
             }
-        )
-
-        actions.addView(
-            button("📏 FIELD & YIELD CALCULATOR") {
-                startActivity(
-                    Intent(this, MainActivity::class.java)
-                )
-            }
-        )
-
-        actions.addView(
-            button("🌦️ WEATHER & RISKS") {
-                startActivity(
-                    Intent(this, WeatherActivity::class.java)
-                )
-            }
-        )
-
-        actions.addView(
-            button("🚜 RECORD HARVEST") {
-                startActivity(
-                    Intent(this, MainActivity::class.java)
-                )
-            }
-        )
-
-        layout.addView(actions)
-
-        layout.addView(
-            text("🌽 My Maize Fields", 23f, true)
-        )
-
-        fieldContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+            nav.addView(tab, LinearLayout.LayoutParams(0, dp(57), 1f))
         }
-
-        layout.addView(fieldContainer)
-
-        scroll.addView(layout)
-        setContentView(scroll)
+        root.addView(nav, LinearLayout.LayoutParams(-1, -2))
+        setContentView(root)
     }
 
     override fun onResume() {
         super.onResume()
-        if (::storage.isInitialized) {
-            refreshDashboard()
-        }
+        if (::summary.isInitialized) refresh()
     }
 
-    private fun refreshDashboard() {
+    private fun refresh() {
         val fields = storage.loadFields()
-
-        val totalHectares = fields.sumOf { it.hectares() }
-        val estimatedTons = fields.sumOf { it.estimatedTons() }
-        val harvestedTons = fields.sumOf { it.harvestedTons }
-        val remainingTons = fields.sumOf { it.remainingTons() }
-
-        summary.text = String.format(
-            Locale.getDefault(),
-            "🌾 Saved Fields: %d\n\n" +
-            "📏 Total Area: %.2f ha\n\n" +
-            "🌽 Estimated Harvest: %.2f tons\n\n" +
-            "🚜 Harvested: %.2f tons\n\n" +
-            "📦 Remaining Estimate: %.2f tons",
-            fields.size,
-            totalHectares,
-            estimatedTons,
-            harvestedTons,
-            remainingTons
-        )
-
-        fieldContainer.removeAllViews()
-
+        val hectares = fields.sumOf { it.hectares() }
+        val expected = fields.sumOf { it.estimatedTons() }
+        val harvested = fields.sumOf { it.harvestedTons }
+        summary.text = String.format(Locale.getDefault(),
+            "Saved fields: %d    •    Area: %.2f ha\nEstimated harvest: %.2f tons\nHarvested: %.2f tons",
+            fields.size, hectares, expected, harvested)
+        fieldArea.removeAllViews()
         if (fields.isEmpty()) {
-            val emptyCard = card()
-            emptyCard.addView(
-                text("No saved fields yet. Add your first maize field.")
-            )
-            emptyCard.addView(
-                button("ADD FIRST FIELD") {
-                    startActivity(
-                        Intent(this, MainActivity::class.java)
-                    )
-                }
-            )
-            fieldContainer.addView(emptyCard)
-            return
-        }
-
-        for (field in fields) {
-            val fieldCard = card()
-
-            fieldCard.addView(
-                text("🌽 ${field.name}", 20f, true)
-            )
-
-            fieldCard.addView(
-                text(
-                    String.format(
-                        Locale.getDefault(),
-                        "%s • %s\n" +
-                        "Area: %.2f ha\n" +
-                        "Expected: %.2f tons\n" +
-                        "Harvested: %.2f tons\n" +
-                        "Remaining: %.2f tons",
-                        field.maizeVariety,
-                        field.shape,
-                        field.hectares(),
-                        field.estimatedTons(),
-                        field.harvestedTons,
-                        field.remainingTons()
-                    )
-                )
-            )
-
-            val progress = ProgressBar(
-                this,
-                null,
-                android.R.attr.progressBarStyleHorizontal
-            ).apply {
-                max = 100
-                this.progress = field.harvestProgress().toInt()
-                progressTintList =
-                    android.content.res.ColorStateList.valueOf(green)
+            fieldArea.addView(label("No fields saved yet. Tap Field Designer to add your first field.", 13f))
+        } else {
+            for (f in fields.take(5)) {
+                val item = panel()
+                item.addView(label("🌽  " + f.name, 16f, true))
+                item.addView(label(String.format(Locale.getDefault(),
+                    "%.2f ha  •  %.2f tons expected  •  %.2f tons harvested",
+                    f.hectares(), f.estimatedTons(), f.harvestedTons), 12f))
+                item.setOnClickListener { openFields() }
+                fieldArea.addView(item, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
             }
-
-            fieldCard.addView(progress)
-
-            fieldCard.addView(
-                text(
-                    String.format(
-                        Locale.getDefault(),
-                        "%.1f%% of field area harvested",
-                        field.harvestProgress()
-                    ),
-                    14f
-                )
-            )
-
-            fieldCard.addView(
-                button("OPEN FIELD MANAGER") {
-                    startActivity(
-                        Intent(this, MainActivity::class.java)
-                    )
-                }
-            )
-
-            fieldCard.addView(
-                button("🌦️ FIELD WEATHER") {
-                    startActivity(
-                        Intent(this, WeatherActivity::class.java)
-                            .putExtra("field_id", field.id)
-                    )
-                }
-            )
-
-            fieldContainer.addView(fieldCard)
         }
     }
 }
