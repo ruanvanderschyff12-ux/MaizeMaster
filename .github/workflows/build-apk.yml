@@ -24,6 +24,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Keep the same debug signing certificate across GitHub-hosted runners.
+      # This is for development/test APKs only, not production releases.
+      - name: Restore debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: maizemaster-debug-signing-v1
+
       - name: Build MaizeMaster APK
         run: gradle assembleDebug --stacktrace
 
