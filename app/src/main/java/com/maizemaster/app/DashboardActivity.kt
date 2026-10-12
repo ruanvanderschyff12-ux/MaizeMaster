@@ -85,7 +85,7 @@ class DashboardActivity : Activity() {
         }
 
         val logo = ImageView(this).apply {
-            setImageResource(R.drawable.maizemaster_logo)
+            setImageResource(R.drawable.maizemaster_realistic_banner)
             scaleType = ImageView.ScaleType.FIT_CENTER
             adjustViewBounds = true
             contentDescription = "MaizeMaster - Plan, Grow, Monitor, Harvest"
