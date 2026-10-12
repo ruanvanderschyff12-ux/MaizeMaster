@@ -21,6 +21,9 @@ class FieldDesignerView(context: Context) : View(context) {
     private var cachedBitmap: Bitmap? = null
     private var needsRedraw = true
 
+    var growthDays = 45
+        set(value) { field = value.coerceAtLeast(0); refreshField() }
+
     var fieldWidth = 200f
         set(value) {
             val newValue = value.coerceAtLeast(1f)
@@ -278,12 +281,12 @@ class FieldDesignerView(context: Context) : View(context) {
                     )
                 )
 
-                if (plantSize > 0.5f) {
+                if (plantSize > 0.5f && growthDays >= 7) {
                     drawMaizePlant(
                         canvas,
                         x,
                         y,
-                        plantSize
+                        plantSize * (growthDays / 100f).coerceIn(0.12f, 1f)
                     )
                 }
             }
