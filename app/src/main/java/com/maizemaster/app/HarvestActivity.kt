@@ -191,10 +191,30 @@ class HarvestActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(28, 8, 28, 0)
         }
-        val tons = number("Tonnes collected on this trip")
-        val hectares = number("Hectares harvested on this trip")
-        form.addView(tons)
+        val meters = trips.getFloat("${field.id}_gps_meters", 0f).toDouble()
+        val points = trips.getInt("${field.id}_gps_points", 0)
+        val remaining = (field.hectares() - field.harvestedHectares).coerceAtLeast(0.0)
+        val width = number("Combine cutting width (metres)").apply { setText("6.0") }
+        val hectares = number("Estimated hectares")
+        val tons = number("Estimated or measured tonnes")
+        val guidance = label("GPS estimates are approximate; adjust before saving.", 13f)
+        fun updateEstimate() {
+            val w = width.text.toString().toDoubleOrNull() ?: 0.0
+            val area = if (points >= 2 && w in 0.1..30.0) (meters * w / 10000.0).coerceAtMost(remaining) else 0.0
+            hectares.setText(String.format(Locale.US, "%.3f", area))
+            tons.setText(String.format(Locale.US, "%.2f", area * field.expectedYield))
+            guidance.text = String.format(Locale.US, "GPS: %.2f km, %d movements. Area: %.3f ha. Check overlaps and measured load weight.", meters / 1000.0, points, area)
+        }
+        width.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updateEstimate() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        form.addView(width)
+        form.addView(guidance)
         form.addView(hectares)
+        form.addView(tons)
+        updateEstimate()
         val dialog = AlertDialog.Builder(this)
             .setTitle("Finish trip — ${field.name}")
             .setMessage("Enter this trip's amounts, not the running total.")
@@ -217,12 +237,15 @@ class HarvestActivity : Activity() {
                         Toast.makeText(this, "Could not save harvest; trip remains active.", Toast.LENGTH_LONG).show()
                         return@setOnClickListener
                     }
+                    stopGps()
                     val entries = history(field.id)
                     entries.put(JSONObject().apply {
                         put("start", started)
                         put("end", stamp())
                         put("tons", t)
                         put("hectares", h)
+                        put("gpsMeters", meters)
+                        put("cuttingWidth", width.text.toString().toDoubleOrNull() ?: 0.0)
                     })
                     trips.edit()
                         .putString("${field.id}_history", entries.toString())
