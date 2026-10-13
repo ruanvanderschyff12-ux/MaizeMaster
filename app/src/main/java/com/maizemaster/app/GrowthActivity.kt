@@ -65,7 +65,7 @@ class GrowthActivity : Activity() {
                 }
                 card.addView(picture, LinearLayout.LayoutParams(-1, dp(260)))
                 card.addView(text(growth.stage, 17f, true))
-                card.addView(text("Calendar estimate: ${calendar.stage}", 13f))
+                card.addView(text("Calendar estimate: ${calendar.stage} (${calendar.progressPercent}%)", 13f))
                 card.addView(text(weatherEstimate.details, 13f).apply { setPadding(0, dp(8), 0, dp(8)) })
                 card.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
                     max = 100
@@ -75,12 +75,35 @@ class GrowthActivity : Activity() {
                     bottomMargin = dp(12)
                 })
                 card.addView(text("Estimated progress: ${growth.progressPercent}%"))
-                card.addView(text("Days since planting: ${growth.daysSincePlanting}"))
-                card.addView(text("Estimated days to maturity: ${growth.daysUntilMaturity}"))
+                card.addView(text("Actual days since planting: ${calendar.daysSincePlanting}"))
+                card.addView(text("Weather-adjusted equivalent growth days: ${growth.daysSincePlanting}"))
+                card.addView(text("Estimated days to maturity (weather-adjusted): ${growth.daysUntilMaturity}"))
                 card.addView(text(growth.advice, 14f).apply { setPadding(0, dp(10), 0, 0) })
-                if (field.growthStage.isNotBlank()) {
-                    card.addView(text("Observed stage: " + field.growthStage, 13f))
+                val observed = field.growthStage.takeUnless {
+                    it.isBlank() || it.equals("Not planted", true) ||
+                        it.equals("Not recorded", true)
                 }
+                card.addView(text(
+                    if (observed == null) "Field observation: Not recorded yet"
+                    else "Field observation (manually entered): $observed" +
+                        if (field.growthObservedDate.isNotBlank()) " • ${field.growthObservedDate}" else "",
+                    13f
+                ))
+                card.addView(text(
+                    "Field observations are separate from calculated estimates. Check leaf count and plant condition before recording a stage.",
+                    12f
+                ))
+                card.addView(Button(this).apply {
+                    text = "Record actual growth stage"
+                    isAllCaps = false
+                    setOnClickListener {
+                        MaizeGrowthTracker.show(
+                            this@GrowthActivity,
+                            FieldStorage(this@GrowthActivity),
+                            field.id
+                        ) { recreate() }
+                    }
+                })
                 if (field.growthNotes.isNotBlank()) {
                     card.addView(text("Field notes: " + field.growthNotes, 13f))
                 }
