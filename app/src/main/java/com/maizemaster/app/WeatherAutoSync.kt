@@ -22,7 +22,7 @@ object WeatherAutoSync {
                 if (lat == null || lon == null || !lat.isFinite() || !lon.isFinite() ||
                     lat !in -90.0..90.0 || lon !in -180.0..180.0) continue
                 val now = System.currentTimeMillis()
-                if (now - cache.getLong("${field.id}_updated", 0L) < 3600000L) continue
+                if (now - cache.getLong("${field.id}_growth_updated", 0L) < 3600000L) continue
                 var connection: HttpURLConnection? = null
                 try {
                     val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
@@ -76,6 +76,7 @@ object WeatherAutoSync {
                     cache.edit()
                         .putString(historyKey, history.toString())
                         .putString("${field.id}_daily_growth", observed.toString())
+                        .putLong("${field.id}_growth_updated", now)
                         .putString("${field.id}_forecast", forecast.toString())
                         .putLong("${field.id}_updated", now)
                         .apply()
