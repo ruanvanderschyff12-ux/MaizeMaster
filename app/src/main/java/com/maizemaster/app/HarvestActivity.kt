@@ -1,6 +1,9 @@
 package com.maizemaster.app
 
 import android.app.Activity
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.app.AlertDialog
 import android.graphics.Color
 import android.graphics.Typeface
@@ -18,6 +21,39 @@ import java.util.Locale
 class HarvestActivity : Activity() {
     private val storage by lazy { FieldStorage(this) }
     private val trips by lazy { getSharedPreferences("maizemaster_harvest_trips", MODE_PRIVATE) }
+    private var pendingField: String? = null
+    private fun beginGps(id: String) {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            pendingField = id
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 602)
+            return
+        }
+        trips.edit().putString("${id}_active", stamp()).putFloat("${id}_gps_meters", 0f)
+            .putInt("${id}_gps_points", 0).remove("${id}_gps_error").apply()
+        try {
+            startForegroundService(Intent(this, HarvestGpsService::class.java).apply {
+                action = HarvestGpsService.ACTION_START
+                putExtra(HarvestGpsService.EXTRA_FIELD, id)
+            })
+        } catch (e: Exception) {
+            trips.edit().putString("${id}_gps_error", "GPS service could not start: ${e.message}").apply()
+        }
+        render()
+    }
+    private fun stopGps() {
+        startService(Intent(this, HarvestGpsService::class.java).apply {
+            action = HarvestGpsService.ACTION_STOP
+        })
+    }
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 602) {
+            val id = pendingField
+            pendingField = null
+            if (id != null && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginGps(id)
+            else Toast.makeText(this, "Precise location is needed for GPS tracking.", Toast.LENGTH_LONG).show()
+        }
+    }
     private fun dp(value: Int) = (value * resources.displayMetrics.density + 0.5f).toInt()
     private val forest = Color.rgb(12, 78, 49)
     private val green = Color.rgb(24, 142, 72)
@@ -106,6 +142,13 @@ class HarvestActivity : Activity() {
                 setPadding(0, dp(12), 0, dp(14))
             })
             card.addView(label(if (active != null) "🚜 Trip started: $active" else "No active harvest trip", 14f))
+            if (active != null) card.addView(label(String.format(Locale.US,
+                "📍 GPS distance: %.2f km • %d valid movements",
+                trips.getFloat("${field.id}_gps_meters", 0f) / 1000.0,
+                trips.getInt("${field.id}_gps_points", 0)), 14f))
+            if (active != null) trips.getString("${field.id}_gps_error", null)?.let {
+                card.addView(label("GPS warning: $it", 13f))
+            }
             card.addView(Button(this).apply {
                 isAllCaps = false
                 text = if (active == null) "▶ Start harvest trip" else "■ End trip and record load"
@@ -113,8 +156,7 @@ class HarvestActivity : Activity() {
                 backgroundTintList = android.content.res.ColorStateList.valueOf(green)
                 setOnClickListener {
                     if (active == null) {
-                        trips.edit().putString("${field.id}_active", stamp()).apply()
-                        render()
+                        beginGps(field.id)
                     } else finishTrip(field, active)
                 }
             })
@@ -125,6 +167,7 @@ class HarvestActivity : Activity() {
                     AlertDialog.Builder(this@HarvestActivity)
                         .setMessage("Cancel this trip without adding any harvest?")
                         .setPositiveButton("Cancel trip") { _, _ ->
+                            stopGps()
                             trips.edit().remove("${field.id}_active").apply()
                             render()
                         }.setNegativeButton("Keep trip", null).show()
