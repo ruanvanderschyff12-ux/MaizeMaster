@@ -39,9 +39,10 @@ class GrowthActivity : Activity() {
         scroll.addView(body)
         setContentView(scroll)
         body.addView(text("🌱 Maize growth stages", 24f, true))
-        body.addView(text("Automatic estimates refresh whenever this screen opens. Actual stages depend on temperature, moisture and maize variety.", 13f).apply {
+        body.addView(text("Automatic estimates refresh whenever this screen opens. Weather history downloads in the background; reopen this screen after a moment to see updates. Actual stages depend on temperature, moisture and maize variety.", 13f).apply {
             setPadding(0, dp(8), 0, dp(16))
         })
+        WeatherAutoSync.refresh(this)
         val fields = FieldStorage(this).loadFields()
         if (fields.isEmpty()) {
             body.addView(text("No saved fields yet. Add a field and set its planting date to start tracking."))
