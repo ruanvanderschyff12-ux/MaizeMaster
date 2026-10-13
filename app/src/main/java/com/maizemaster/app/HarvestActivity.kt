@@ -9,6 +9,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.widget.*
 import org.json.JSONArray
@@ -22,6 +24,28 @@ class HarvestActivity : Activity() {
     private val storage by lazy { FieldStorage(this) }
     private val trips by lazy { getSharedPreferences("maizemaster_harvest_trips", MODE_PRIVATE) }
     private var pendingField: String? = null
+    private val refreshHandler = Handler(Looper.getMainLooper())
+    private val gpsLabels = mutableMapOf<String, TextView>()
+    private val refreshGps = object : Runnable {
+        override fun run() {
+            for ((id, label) in gpsLabels) {
+                label.text = String.format(Locale.US, "📍 GPS distance: %.2f km • %d valid movements",
+                    trips.getFloat("${id}_gps_meters", 0f) / 1000.0,
+                    trips.getInt("${id}_gps_points", 0))
+            }
+            refreshHandler.postDelayed(this, 3000L)
+        }
+    }
+    override fun onResume() {
+        super.onResume()
+        render()
+        refreshHandler.removeCallbacks(refreshGps)
+        refreshHandler.post(refreshGps)
+    }
+    override fun onPause() {
+        refreshHandler.removeCallbacks(refreshGps)
+        super.onPause()
+    }
     private fun beginGps(id: String) {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             pendingField = id
@@ -82,6 +106,7 @@ class HarvestActivity : Activity() {
     }
 
     private fun render() {
+        gpsLabels.clear()
         window.statusBarColor = forest
         window.navigationBarColor = forest
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(244, 249, 245)) }
@@ -142,10 +167,11 @@ class HarvestActivity : Activity() {
                 setPadding(0, dp(12), 0, dp(14))
             })
             card.addView(label(if (active != null) "🚜 Trip started: $active" else "No active harvest trip", 14f))
-            if (active != null) card.addView(label(String.format(Locale.US,
-                "📍 GPS distance: %.2f km • %d valid movements",
-                trips.getFloat("${field.id}_gps_meters", 0f) / 1000.0,
-                trips.getInt("${field.id}_gps_points", 0)), 14f))
+            if (active != null) {
+                val gpsLabel = label("Waiting for GPS signal...", 14f)
+                gpsLabels[field.id] = gpsLabel
+                card.addView(gpsLabel)
+            }
             if (active != null) trips.getString("${field.id}_gps_error", null)?.let {
                 card.addView(label("GPS warning: $it", 13f))
             }
