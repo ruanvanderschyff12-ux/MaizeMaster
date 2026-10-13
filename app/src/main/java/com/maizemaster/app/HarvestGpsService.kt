@@ -85,7 +85,11 @@ class HarvestGpsService : Service(), LocationListener {
     override fun onLocationChanged(location: Location) {
         val id = fieldId ?: return
         if (preferences.getString("${id}_active", null) == null) { stopTracking(); return }
-        if (location.accuracy > 25f || !location.hasAccuracy()) return
+        if (!location.hasAccuracy() || location.accuracy > 40f) {
+            preferences.edit().putString("${id}_gps_error", "Waiting for a stronger GPS signal. Try outdoors.").apply()
+            return
+        }
+        preferences.edit().remove("${id}_gps_error").apply()
         val last = previous
         previous = location
         if (last == null) return
