@@ -14,7 +14,7 @@ object WeatherGrowthEstimator {
         val baseline = MaizeGrowthCalculator.calculate(field.plantingDate, field.maturityDays)
         val cache = context.getSharedPreferences("maizemaster_weather_cache", Context.MODE_PRIVATE)
         val raw = cache.getString("${field.id}_daily_growth", null)
-        val lastUpdated = cache.getLong("${field.id}_updated", 0L)
+        val lastUpdated = cache.getLong("${field.id}_growth_updated", 0L)
         if (raw.isNullOrBlank() || lastUpdated <= 0 ||
             System.currentTimeMillis() - lastUpdated > 48L * 60 * 60 * 1000) {
             return Estimate(baseline, "Calendar-based estimate. Recent field weather is not available; open the dashboard with internet access and a saved field location.")
@@ -48,9 +48,6 @@ object WeatherGrowthEstimator {
         if (days < 7) return Estimate(baseline, "Calendar-based estimate. At least seven days of observed temperature data are needed for a weather comparison.")
         // Approximate reference 12.5 GDD/day. Cap adjustment to avoid false precision.
         val adjustment = ((heatUnits / 12.5) - days).roundToInt().coerceIn(-7, 7)
-        val adjustedDays = (baseline.daysSincePlanting + adjustment).coerceAtLeast(0)
-        val estimatedDate = planted.plusDays(adjustedDays.toLong()).toString()
-        val adjusted = MaizeGrowthCalculator.calculate(estimatedDate, field.maturityDays)
         // Calculator uses a planting date, so instead shift the planting date backwards/forwards.
         val shiftedPlanting = planted.minusDays(adjustment.toLong()).toString()
         val result = MaizeGrowthCalculator.calculate(shiftedPlanting, field.maturityDays)
