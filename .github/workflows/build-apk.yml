@@ -70,3 +70,5 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+# Update installation test: preserve permanent signing identity across builds.
