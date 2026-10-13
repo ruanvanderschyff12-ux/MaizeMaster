@@ -56,12 +56,16 @@ class GrowthActivity : Activity() {
             if (field.plantingDate.isBlank() || field.maturityDays <= 0) {
                 card.addView(text("Set the planting date and expected maturity days in My Fields."))
             } else {
-                val growth = MaizeGrowthCalculator.calculate(field.plantingDate, field.maturityDays)
+                val calendar = MaizeGrowthCalculator.calculate(field.plantingDate, field.maturityDays)
+                val weatherEstimate = WeatherGrowthEstimator.calculate(this, field)
+                val growth = weatherEstimate.result
                 val picture = MaizeGrowthView(this).apply {
                     progressPercent = growth.progressPercent
                 }
                 card.addView(picture, LinearLayout.LayoutParams(-1, dp(260)))
                 card.addView(text(growth.stage, 17f, true))
+                card.addView(text("Calendar estimate: ${calendar.stage}", 13f))
+                card.addView(text(weatherEstimate.details, 13f).apply { setPadding(0, dp(8), 0, dp(8)) })
                 card.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
                     max = 100
                     progress = growth.progressPercent
