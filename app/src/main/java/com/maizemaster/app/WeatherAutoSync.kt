@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.LocalDate
 
 /** Refreshes weather for all fields with saved coordinates when dashboard opens. */
 object WeatherAutoSync {
@@ -26,7 +27,7 @@ object WeatherAutoSync {
                 try {
                     val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
                         "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m" +
-                        "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=7"
+                        "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&past_days=30&forecast_days=7"
                     connection = URL(url).openConnection() as HttpURLConnection
                     connection.connectTimeout = 10000
                     connection.readTimeout = 10000
@@ -45,9 +46,28 @@ object WeatherAutoSync {
                     })
                     val history = JSONArray()
                     for (i in maxOf(0, old.length() - 90) until old.length()) history.put(old.get(i))
-                    val forecast = StringBuilder("🌽 ${field.name}\nUpdated automatically\n\n")
                     val dates = daily.getJSONArray("time")
+                    val highs = daily.getJSONArray("temperature_2m_max")
+                    val lows = daily.getJSONArray("temperature_2m_min")
+                    val rains = daily.getJSONArray("precipitation_sum")
+                    val observed = JSONArray()
+                    val today = LocalDate.now()
                     for (i in 0 until dates.length()) {
+                        val day = try { LocalDate.parse(dates.getString(i)) } catch (_: Exception) { continue }
+                        if (day.isAfter(today)) continue
+                        val hi = highs.optDouble(i, Double.NaN)
+                        val lo = lows.optDouble(i, Double.NaN)
+                        val rain = rains.optDouble(i, Double.NaN)
+                        if (!hi.isFinite() || !lo.isFinite() || !rain.isFinite()) continue
+                        observed.put(JSONObject().apply {
+                            put("date", day.toString())
+                            put("high", hi)
+                            put("low", lo)
+                            put("rain", rain)
+                        })
+                    }
+                    val forecast = StringBuilder("🌽 ${field.name}\nUpdated automatically\n\n")
+                    for (i in maxOf(0, dates.length() - 7) until dates.length()) {
                         forecast.append("${dates.getString(i)}: ")
                         forecast.append("${daily.getJSONArray("temperature_2m_min").optDouble(i)}–")
                         forecast.append("${daily.getJSONArray("temperature_2m_max").optDouble(i)}°C, ")
@@ -55,6 +75,7 @@ object WeatherAutoSync {
                     }
                     cache.edit()
                         .putString(historyKey, history.toString())
+                        .putString("${field.id}_daily_growth", observed.toString())
                         .putString("${field.id}_forecast", forecast.toString())
                         .putLong("${field.id}_updated", now)
                         .apply()
