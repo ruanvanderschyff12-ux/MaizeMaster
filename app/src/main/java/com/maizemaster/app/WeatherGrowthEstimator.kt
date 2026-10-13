@@ -3,7 +3,6 @@ package com.maizemaster.app
 import android.content.Context
 import org.json.JSONArray
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
 /** Experimental temperature adjustment; rainfall is a risk indicator, not soil moisture. */
@@ -36,7 +35,7 @@ object WeatherGrowthEstimator {
             val rain = item.optDouble("rain", Double.NaN)
             if (!high.isFinite() || !low.isFinite() || !rain.isFinite()) continue
             // Simplified maize GDD: base 10 C, capped daily maximum 30 C.
-            val gdd = (((high.coerceAtMost(30.0) + low.coerceAtLeast(10.0)) / 2.0) - 10.0).coerceAtLeast(0.0)
+            val gdd = (((high.coerceIn(10.0, 30.0) + low.coerceIn(10.0, 30.0)) / 2.0) - 10.0).coerceAtLeast(0.0)
             heatUnits += gdd
             days++
             if (!date.isBefore(today.minusDays(6))) {
@@ -63,6 +62,6 @@ object WeatherGrowthEstimator {
             adjustment < 0 -> "about ${-adjustment} days behind"
             else -> "similar to calendar timing"
         }
-        return Estimate(result, "Weather-adjusted experimental estimate: $direction (using $days observed days, max +/-7 days). $risk$heat Confirm the real stage by checking plants; this is not a field measurement.")
+        return Estimate(result, "Weather-adjusted experimental estimate: $direction (using $days days of historical weather data, max +/-7 days; simplified growing-degree-day comparison). $risk$heat This model does not measure soil moisture, crop stress or actual growth. Confirm the stage by checking plants.")
     }
 }
