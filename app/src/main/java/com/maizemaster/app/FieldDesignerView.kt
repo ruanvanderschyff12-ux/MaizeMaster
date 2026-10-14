@@ -11,6 +11,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
 import android.view.View
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import org.json.JSONArray
 import kotlin.math.cos
 import kotlin.math.ceil
@@ -20,6 +22,39 @@ import kotlin.math.min
 class FieldDesignerView(context: Context) : View(context) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var zoom = 1f
+    private var panX = 0f
+    private var panY = 0f
+    private var touchX = 0f
+    private var touchY = 0f
+    private val pinch = ScaleGestureDetector(context,
+        object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                zoom = (zoom * detector.scaleFactor).coerceIn(1f, 8f)
+                invalidate()
+                return true
+            }
+        })
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        pinch.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                touchX = event.x; touchY = event.y
+                parent?.requestDisallowInterceptTouchEvent(true)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!pinch.isInProgress && event.pointerCount == 1) {
+                    panX += event.x - touchX
+                    panY += event.y - touchY
+                    invalidate()
+                }
+                touchX = event.x; touchY = event.y
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                parent?.requestDisallowInterceptTouchEvent(false)
+        }
+        return true
+    }
     private var cachedBitmap: Bitmap? = null
     private var needsRedraw = true
 
@@ -107,7 +142,12 @@ class FieldDesignerView(context: Context) : View(context) {
             paint.style = Paint.Style.FILL
             paint.shader = null
             paint.color = Color.WHITE
+            canvas.save()
+            canvas.translate(width / 2f + panX, height / 2f + panY)
+            canvas.scale(zoom, zoom)
+            canvas.translate(-width / 2f, -height / 2f)
             canvas.drawBitmap(it, 0f, 0f, paint)
+            canvas.restore()
         }
     }
 
