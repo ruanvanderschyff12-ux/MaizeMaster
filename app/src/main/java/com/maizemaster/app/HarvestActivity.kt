@@ -198,6 +198,7 @@ class HarvestActivity : Activity() {
                 card.addView(label("LIVE GPS HARVEST ROUTE", 13f, true))
                 val map = HarvestRouteView(this).apply {
                     fieldShape = field.shape
+                    rowSpacing = field.rowSpacing
                     fieldWidth = field.width
                     fieldLength = field.length
                     cuttingWidth = trips.getFloat("${field.id}_cutting_width", 6f).toDouble()
