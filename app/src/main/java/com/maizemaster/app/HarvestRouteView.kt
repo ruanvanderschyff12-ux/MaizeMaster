@@ -158,6 +158,10 @@ class HarvestRouteView(context: Context) : View(context) {
         paint.style = Paint.Style.STROKE
         paint.strokeCap = Paint.Cap.ROUND
         canvas.drawPath(path, paint)
+        paint.style = Paint.Style.FILL
+        paint.color = Color.rgb(143, 99, 57)
+        val radius = (cuttingWidth.toFloat() * fit / 2f).coerceAtLeast(1f)
+        for (i in points.indices) canvas.drawCircle(x(i), y(i), radius, paint)
         canvas.restore()
         paint.color = Color.rgb(23, 144, 71)
         paint.style = Paint.Style.STROKE
