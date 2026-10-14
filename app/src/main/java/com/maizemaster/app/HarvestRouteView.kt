@@ -14,6 +14,12 @@ import kotlin.math.cos
 import kotlin.math.max
 
 class HarvestRouteView(context: Context) : View(context) {
+    var fieldShape = "Rectangle"
+        set(value) { field = value; invalidate() }
+    var fieldWidth = 200.0
+        set(value) { field = value.coerceAtLeast(1.0); invalidate() }
+    var fieldLength = 300.0
+        set(value) { field = value.coerceAtLeast(1.0); invalidate() }
     var route = JSONArray()
         set(value) { field = value; invalidate() }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -60,12 +66,24 @@ class HarvestRouteView(context: Context) : View(context) {
 
     private fun drawMaizeField(canvas: Canvas) {
         val pad = 16f * resources.displayMetrics.density
-        val bounds = RectF(pad, pad, width - pad, height - pad)
+        val availableW = (width - pad * 2).coerceAtLeast(1f)
+        val availableH = (height - pad * 2).coerceAtLeast(1f)
+        val actualW = fieldWidth
+        val actualH = if (fieldShape == "Circle") actualW else fieldLength
+        val fit = minOf(availableW / actualW, availableH / actualH).toFloat()
+        val drawW = actualW.toFloat() * fit
+        val drawH = actualH.toFloat() * fit
+        val bounds = RectF((width - drawW) / 2f, (height - drawH) / 2f,
+            (width + drawW) / 2f, (height + drawH) / 2f)
+        val boundary = Path().apply {
+            if (fieldShape == "Circle" || fieldShape == "Oval") addOval(bounds, Path.Direction.CW)
+            else addRect(bounds, Path.Direction.CW)
+        }
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(128, 90, 52)
-        canvas.drawRoundRect(bounds, 16f, 16f, paint)
+        canvas.drawPath(boundary, paint)
         canvas.save()
-        canvas.clipRect(bounds)
+        canvas.clipPath(boundary)
         val spacing = 19f * resources.displayMetrics.density
         var x = bounds.left + spacing / 2
         while (x < bounds.right) {
