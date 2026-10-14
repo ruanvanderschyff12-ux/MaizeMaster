@@ -136,6 +136,7 @@ class DashboardActivity : Activity() {
                 .setPositiveButton("Back up") { _, _ -> FieldCloudBackup.backup(this) }
                 .show()
         })
+        account.addView(button("Restore fields from cloud") { FieldCloudBackup.restore(this) })
         content.addView(account, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
         val weather = panel()
