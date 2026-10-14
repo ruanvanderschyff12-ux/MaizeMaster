@@ -71,44 +71,65 @@ class HarvestRouteView(context: Context) : View(context) {
     }
 
     private fun drawMaizeField(canvas: Canvas, outline: Path? = null) {
-        val pad = 16f * resources.displayMetrics.density
-        val availableW = (width - pad * 2).coerceAtLeast(1f)
-        val availableH = (height - pad * 2).coerceAtLeast(1f)
-        val actualW = fieldWidth
-        val actualH = if (fieldShape == "Circle") actualW else fieldLength
-        val fit = minOf(availableW / actualW, availableH / actualH).toFloat()
-        val drawW = actualW.toFloat() * fit
-        val drawH = actualH.toFloat() * fit
-        val bounds = RectF((width - drawW) / 2f, (height - drawH) / 2f,
+        val density = resources.displayMetrics.density
+        val pad = 12f * density
+        val displayW = (width - 2f * pad).coerceAtLeast(1f)
+        val displayH = (height - 2f * pad).coerceAtLeast(1f)
+        val actualW = fieldWidth.coerceAtLeast(1.0)
+        val actualH = if (fieldShape == "Circle") actualW else fieldLength.coerceAtLeast(1.0)
+        // Rotate long schematic fields to use the available landscape map area.
+        val rotate = outline == null && actualH > actualW * 1.3 && displayW > displayH
+        val worldW = if (rotate) actualH else actualW
+        val worldH = if (rotate) actualW else actualH
+        val fit = minOf(displayW / worldW, displayH / worldH).toFloat()
+        val drawW = worldW.toFloat() * fit
+        val drawH = worldH.toFloat() * fit
+        val bounds = if (outline != null) {
+            val result = RectF()
+            outline.computeBounds(result, true)
+            result
+        } else RectF((width - drawW) / 2f, (height - drawH) / 2f,
             (width + drawW) / 2f, (height + drawH) / 2f)
-        val boundary = Path().apply {
-            if (fieldShape == "Circle" || fieldShape == "Oval") addOval(bounds, Path.Direction.CW)
-            else addRect(bounds, Path.Direction.CW)
+        val shapePath = Path().apply {
+            if (outline != null) addPath(outline)
+            else if (fieldShape == "Circle" || fieldShape == "Oval") addOval(bounds, Path.Direction.CW)
+            else addRoundRect(bounds, 5f * density, 5f * density, Path.Direction.CW)
         }
         paint.style = Paint.Style.FILL
-        paint.color = Color.rgb(128, 90, 52)
-        canvas.drawPath(outline ?: boundary, paint)
+        paint.color = Color.rgb(117, 78, 42)
+        canvas.drawPath(shapePath, paint)
         canvas.save()
-        canvas.clipPath(outline ?: boundary)
-        val spacing = 19f * resources.displayMetrics.density
-        var x = bounds.left + spacing / 2
-        while (x < bounds.right) {
-            paint.color = Color.rgb(40, 125, 52)
-            paint.strokeWidth = spacing * 0.65f
-            canvas.drawLine(x, bounds.top, x, bounds.bottom, paint)
-            var y = bounds.top + spacing / 2
-            while (y < bounds.bottom) {
-                paint.color = Color.rgb(105, 184, 70)
+        canvas.clipPath(shapePath)
+        val spacing = (minOf(bounds.width(), bounds.height()) / 12f).coerceIn(7f * density, 17f * density)
+        // Alternating soil tracks make rows readable at different zoom levels.
+        var row = bounds.top + spacing * 0.5f
+        while (row < bounds.bottom) {
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = spacing * 0.56f
+            paint.color = Color.rgb(45, 113, 43)
+            canvas.drawLine(bounds.left, row, bounds.right, row, paint)
+            var plantX = bounds.left + spacing * 0.5f
+            while (plantX < bounds.right) {
+                val r = spacing * 0.44f
                 paint.style = Paint.Style.FILL
-                canvas.drawOval(RectF(x - spacing * 0.4f, y - spacing * 0.18f,
-                    x + spacing * 0.4f, y + spacing * 0.18f), paint)
-                canvas.drawOval(RectF(x - spacing * 0.18f, y - spacing * 0.4f,
-                    x + spacing * 0.18f, y + spacing * 0.4f), paint)
-                y += spacing
+                paint.color = Color.rgb(24, 102, 37)
+                canvas.drawOval(RectF(plantX-r, row-r*0.25f, plantX+r, row+r*0.25f), paint)
+                canvas.drawOval(RectF(plantX-r*0.25f, row-r, plantX+r*0.25f, row+r), paint)
+                paint.color = Color.rgb(105, 187, 55)
+                canvas.drawOval(RectF(plantX-r*0.83f, row-r*0.20f, plantX+r*0.83f, row+r*0.20f), paint)
+                canvas.drawOval(RectF(plantX-r*0.20f, row-r*0.83f, plantX+r*0.20f, row+r*0.83f), paint)
+                paint.color = Color.rgb(224, 186, 65)
+                canvas.drawCircle(plantX, row, r*0.14f, paint)
+                plantX += spacing * 1.15f
             }
-            x += spacing
+            row += spacing * 1.12f
         }
         canvas.restore()
+        paint.style = Paint.Style.STROKE
+        paint.color = Color.rgb(42, 82, 43)
+        paint.strokeWidth = 2f * density
+        canvas.drawPath(shapePath, paint)
+        paint.style = Paint.Style.FILL
     }
 
     override fun onDraw(canvas: Canvas) {
