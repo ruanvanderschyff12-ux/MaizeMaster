@@ -93,6 +93,52 @@ object FieldCloudBackup {
         }
     } catch (_: Exception) { null }
 
+    // Pull remote changes on return to My Fields, but require consent before replacing local data.
+    private var refreshInProgress = false
+    private var lastPromptedVersion: String? = null
+
+    fun refreshFromCloud(activity: Activity, onUpdated: () -> Unit) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val prefs = activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE)
+        if (prefs.getString(OWNER_KEY, null) != uid || refreshInProgress) return
+        refreshInProgress = true
+        FirebaseFirestore.getInstance().collection("farmers").document(uid)
+            .collection("backups").document("fields")
+            .get(com.google.firebase.firestore.Source.SERVER)
+            .addOnCompleteListener { task ->
+                refreshInProgress = false
+                if (!task.isSuccessful || activity.isFinishing ||
+                    FirebaseAuth.getInstance().currentUser?.uid != uid) return@addOnCompleteListener
+                val raw = task.result?.get("fields") as? List<*> ?: return@addOnCompleteListener
+                val remote = parseCloudFields(raw) ?: return@addOnCompleteListener
+                val local = FieldStorage(activity).loadFields()
+                val remoteMaps = remote.map { fieldToMap(it) }
+                if (remoteMaps == local.map { fieldToMap(it) }) {
+                    lastPromptedVersion = null
+                    return@addOnCompleteListener
+                }
+                val version = uid + remoteMaps.toString()
+                if (lastPromptedVersion == version) return@addOnCompleteListener
+                lastPromptedVersion = version
+                android.app.AlertDialog.Builder(activity)
+                    .setTitle("Cloud field changes available")
+                    .setMessage("Your account has ${remote.size} cloud fields and this phone has ${local.size} local fields. Downloading will replace this phone's field list. Choose Keep local if you have unsaved-to-cloud changes.")
+                    .setNegativeButton("Keep local", null)
+                    .setPositiveButton("Download cloud fields") { _, _ ->
+                        if (FirebaseAuth.getInstance().currentUser?.uid != uid) return@setPositiveButton
+                        // Recheck local data so we do not overwrite edits made while dialog was open.
+                        if (FieldStorage(activity).loadFields().map { fieldToMap(it) } != local.map { fieldToMap(it) }) {
+                            Toast.makeText(activity, "Local fields changed. Please refresh again.", Toast.LENGTH_LONG).show()
+                            return@setPositiveButton
+                        }
+                        if (FieldStorage(activity).saveFields(remote)) {
+                            onUpdated()
+                            Toast.makeText(activity, "Cloud fields downloaded", Toast.LENGTH_LONG).show()
+                        }
+                    }.show()
+            }
+    }
+
     fun backup(activity: Activity) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid == null) {
