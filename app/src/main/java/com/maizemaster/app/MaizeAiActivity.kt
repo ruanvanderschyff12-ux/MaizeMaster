@@ -132,6 +132,17 @@ class MaizeAiActivity : Activity() {
             setOnClickListener { submit() }
         })
         root.addView(entry)
+        // Edge-to-edge layouts on newer Android versions may not resize for the IME.
+        // Apply the keyboard inset to the bottom composer so it stays above the keyboard.
+        val baseBottom = dp(12)
+        root.setPadding(dp(14), dp(14), dp(14), baseBottom)
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val keyboard = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
+            val navigation = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+            val extra = (keyboard - navigation).coerceAtLeast(0)
+            root.setPadding(dp(14), dp(14), dp(14), baseBottom + extra)
+            insets
+        }
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContentView(root)
     }
