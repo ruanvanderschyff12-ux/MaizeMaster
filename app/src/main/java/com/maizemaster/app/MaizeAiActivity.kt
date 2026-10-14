@@ -55,9 +55,17 @@ class MaizeAiActivity : Activity() {
         return when {
             listOf("hello", "hi", "hey").any { q.trim() == it } ->
                 "Hello! 🌽 Ask about planting, watering, fertiliser, maize growth, pests or harvesting."
+            listOf("weevil", "grain insect", "grain pest", "grain borer", "stored insect", "sitophilus", "prostephanus").any { q.contains(it) } ->
+                "🐛 Stored-maize insects: Maize weevils and larger grain borers can tunnel into kernels and create powdery residues. Inspect several grain samples for live insects, holes and dust. Keep stores clean and dry, monitor grain temperature and moisture, and use only locally registered grain-storage treatments as directed. Never apply household insecticides to food grain."
+            listOf("kernel", "kernels", "grain quality", "broken grain", "discoloured grain").any { q.contains(it) } ->
+                "🌽 Kernel quality: Check a representative sample for broken kernels, insect holes, discolouration, mould and foreign material. Measure grain moisture with a calibrated meter before storage. Separate visibly damaged grain and investigate the cause; appearance alone cannot establish food or feed safety."
+            listOf("mould", "mold", "mycotoxin", "aflatoxin", "fumonisin", "ear rot").any { q.contains(it) } ->
+                "⚠️ Mould and mycotoxins: Maize can contain harmful toxins even when kernels look normal. Do not assume affected grain is safe after drying or removing visibly mouldy kernels. Segregate suspect lots, prevent further moisture exposure and arrange representative laboratory mycotoxin testing before food or feed use."
+            listOf("stalk rot", "grey leaf spot", "gray leaf spot", "northern leaf blight", "maize rust").any { q.contains(it) } ->
+                "🛡️ Maize disease: Note the affected plant parts, lesion shapes, growth stage and recent weather. Several maize diseases can resemble nutrient or weather damage. Photograph symptoms, inspect multiple plants and seek confirmation from a local crop adviser before selecting treatment."
             listOf("water", "irrigat", "drought", "dry soil").any { q.contains(it) } ->
                 "💧 Water management: Check moisture in the root zone rather than relying only on surface appearance. Maize is especially sensitive to water stress around tasseling and silking. Adjust irrigation to soil type, rainfall and crop stage. Avoid waterlogging."
-            listOf("fertili", "nitrogen", "yellow leaf", "yellowing", "nutrient").any { q.contains(it) } ->
+            listOf("fertili", "nitrogen", "yellow leaf", "yellow leaves", "yellowing", "nutrient", "leaves are turning yellow").any { q.contains(it) } ->
                 "🌱 Nutrition: Yellowing can result from nitrogen shortage, water stress, disease or other causes. Check which leaves are affected, soil moisture and recent weather. Use a soil or leaf test before choosing fertiliser rates. Avoid applying products based on leaf colour alone."
             listOf("pest", "worm", "insect", "fall armyworm", "caterpillar").any { q.contains(it) } ->
                 "🐛 Pest scouting: Inspect several places in the field, including the whorl and undersides of leaves. Note the pest, damage level and crop stage. Identify the pest before treatment and follow locally registered product labels and local extension guidance."
