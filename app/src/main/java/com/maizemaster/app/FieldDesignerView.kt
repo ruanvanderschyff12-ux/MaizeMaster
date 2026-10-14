@@ -11,6 +11,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
 import android.view.View
+import org.json.JSONArray
+import kotlin.math.cos
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -20,6 +22,9 @@ class FieldDesignerView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var cachedBitmap: Bitmap? = null
     private var needsRedraw = true
+
+    var gpsBoundary = JSONArray()
+        set(value) { field = value; refreshField() }
 
     var growthDays = 45
         set(value) { field = value.coerceAtLeast(0); refreshField() }
@@ -209,8 +214,39 @@ class FieldDesignerView(context: Context) : View(context) {
             top + drawHeight
         )
 
+        val gpsPoints = mutableListOf<Pair<Double, Double>>()
+        for (i in 0 until gpsBoundary.length()) {
+            val p = gpsBoundary.optJSONArray(i) ?: continue
+            val lat = p.optDouble(0, Double.NaN)
+            val lon = p.optDouble(1, Double.NaN)
+            if (lat.isFinite() && lon.isFinite()) gpsPoints.add(lat to lon)
+        }
+        val trackedOutline = if (gpsPoints.size >= 3) {
+            val lat0 = gpsPoints.map { it.first }.average()
+            val lon0 = gpsPoints.map { it.second }.average()
+            val factor = cos(Math.toRadians(lat0)).coerceAtLeast(0.01)
+            val east = gpsPoints.map { (it.second - lon0) * 111320.0 * factor }
+            val north = gpsPoints.map { (it.first - lat0) * 111320.0 }
+            val minE = east.minOrNull() ?: 0.0
+            val maxE = east.maxOrNull() ?: 1.0
+            val minN = north.minOrNull() ?: 0.0
+            val maxN = north.maxOrNull() ?: 1.0
+            val gpsScale = min(availableWidth.toDouble() / (maxE - minE).coerceAtLeast(1.0),
+                availableHeight.toDouble() / (maxN - minN).coerceAtLeast(1.0))
+            val centerE = (maxE + minE) / 2.0
+            val centerN = (maxN + minN) / 2.0
+            Path().apply {
+                for (i in gpsPoints.indices) {
+                    val px = (width / 2.0 + (east[i] - centerE) * gpsScale).toFloat()
+                    val py = (height / 2.0 - (north[i] - centerN) * gpsScale).toFloat()
+                    if (i == 0) moveTo(px, py) else lineTo(px, py)
+                }
+                close()
+            }
+        } else null
         val fieldPath = Path().apply {
-            if (fieldShape == "Oval" ||
+            if (trackedOutline != null) addPath(trackedOutline)
+            else if (fieldShape == "Oval" ||
                 fieldShape == "Circle"
             ) {
                 addOval(bounds, Path.Direction.CW)
@@ -219,12 +255,17 @@ class FieldDesignerView(context: Context) : View(context) {
             }
         }
 
+        val cropBounds = if (trackedOutline != null) RectF().also { trackedOutline.computeBounds(it, true) } else bounds
+        val cropLeft = cropBounds.left
+        val cropTop = cropBounds.top
+        val cropWidth = cropBounds.width()
+        val cropHeight = cropBounds.height()
         paint.style = Paint.Style.FILL
         paint.shader = LinearGradient(
-            left,
-            top,
-            left + drawWidth,
-            top + drawHeight,
+            cropLeft,
+            cropTop,
+            cropLeft + cropWidth,
+            cropTop + cropHeight,
             Color.rgb(105, 68, 38),
             Color.rgb(154, 107, 64),
             Shader.TileMode.CLAMP
@@ -243,17 +284,17 @@ class FieldDesignerView(context: Context) : View(context) {
             max(2, ceil(actualRows).toInt())
         )
 
-        val rowGap = drawWidth / displayRows
+        val rowGap = cropWidth / displayRows
 
         val plantCount = min(
             26,
-            max(2, (drawHeight / 14f).toInt())
+            max(2, (cropHeight / 14f).toInt())
         )
 
-        val plantGap = drawHeight / plantCount
+        val plantGap = cropHeight / plantCount
 
         for (i in 0 until displayRows) {
-            val x = left + (i + 0.5f) * rowGap
+            val x = cropLeft + (i + 0.5f) * rowGap
 
             paint.style = Paint.Style.STROKE
             paint.color = Color.rgb(75, 48, 28)
@@ -264,14 +305,14 @@ class FieldDesignerView(context: Context) : View(context) {
 
             canvas.drawLine(
                 x,
-                top,
+                cropTop,
                 x,
-                top + drawHeight,
+                cropTop + cropHeight,
                 paint
             )
 
             for (j in 0 until plantCount) {
-                val y = top + (j + 0.5f) * plantGap
+                val y = cropTop + (j + 0.5f) * plantGap
 
                 val plantSize = min(
                     12f,
