@@ -47,38 +47,9 @@ class HarvestRouteView(context: Context) : View(context) {
             }
         })
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        zoomDetector.onTouchEvent(event)
-        when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                lastX = event.x
-                lastY = event.y
-                // At normal zoom, let the surrounding ScrollView handle swipes.
-                if (zoom <= 1f) return false
-                parent?.requestDisallowInterceptTouchEvent(true)
-                return true
-            }
-            MotionEvent.ACTION_POINTER_DOWN -> {
-                parent?.requestDisallowInterceptTouchEvent(true)
-                return true
-            }
-            MotionEvent.ACTION_MOVE -> {
-                if (!zoomDetector.isInProgress && event.pointerCount == 1 && zoom > 1f) {
-                    panX += event.x - lastX
-                    panY += event.y - lastY
-                    invalidate()
-                }
-                lastX = event.x
-                lastY = event.y
-                return zoom > 1f || zoomDetector.isInProgress
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                parent?.requestDisallowInterceptTouchEvent(false)
-                return zoom > 1f
-            }
-        }
-        return zoom > 1f || zoomDetector.isInProgress
-    }
+    // This preview is read-only so vertical swipes always reach the parent ScrollView.
+    // GPS recording and live route drawing continue independently.
+    override fun onTouchEvent(event: MotionEvent): Boolean = false
 
     private fun drawMaizeField(canvas: Canvas, outline: Path? = null) {
         val density = resources.displayMetrics.density
