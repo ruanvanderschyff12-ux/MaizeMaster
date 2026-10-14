@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.widget.*
+import android.text.Html
 import java.util.Locale
 import com.google.firebase.auth.FirebaseAuth
 import org.json.JSONObject
@@ -27,6 +28,9 @@ class MaizeAiActivity : Activity() {
     private lateinit var conversation: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var question: EditText
+    private val history = mutableListOf<Pair<String, String>>()
+    private var busy = false
+    private var thinkingRow: LinearLayout? = null
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density + 0.5f).toInt()
     private fun background(color: Int) = GradientDrawable().apply {
@@ -39,8 +43,14 @@ class MaizeAiActivity : Activity() {
         setTextColor(dark)
         if (bold) setTypeface(null, Typeface.BOLD)
     }
-    private fun addBubble(message: String, farmer: Boolean) {
+    private fun addBubble(message: String, farmer: Boolean): LinearLayout {
         val bubble = text(message, 15f).apply {
+            if (!farmer) {
+                val escaped = android.text.TextUtils.htmlEncode(message)
+                val formatted = escaped.replace(Regex("\\*\\*(.+?)\\*\\*"), "<b>$1</b>").replace("\\n", "<br>")
+                setText(Html.fromHtml(formatted, Html.FROM_HTML_MODE_COMPACT))
+                setLineSpacing(dp(3).toFloat(), 1f)
+            }
             setTextColor(if (farmer) Color.WHITE else dark)
             background = background(if (farmer) green else Color.WHITE)
             setPadding(dp(14), dp(12), dp(14), dp(12))
@@ -54,6 +64,17 @@ class MaizeAiActivity : Activity() {
             bottomMargin = dp(12)
         })
         scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+        return row
+    }
+    private fun finishReply(prompt: String, reply: String, live: Boolean) {
+        thinkingRow?.let { conversation.removeView(it) }
+        thinkingRow = null
+        busy = false
+        addBubble(reply, false)
+        if (live) {
+            history.add(prompt to reply)
+            while (history.size > 4) history.removeAt(0)
+        }
     }
     private fun answer(raw: String): String {
         val q = raw.lowercase(Locale.ROOT)
@@ -85,22 +106,33 @@ class MaizeAiActivity : Activity() {
             listOf("weather", "rain", "heat", "frost").any { q.contains(it) } ->
                 "☀️ Weather: Use the Weather section for current forecasts. Pay particular attention to heat and moisture stress during flowering, strong winds and waterlogged soil. Forecasts and field conditions can differ."
             else ->
-                "🌽 I can offer built-in guidance on planting, fertiliser, irrigation, growth stages, pests, diseases and harvesting. Try asking a question with one of those topics. This version does not yet connect to a live AI model."
+                "🌽 I can offer built-in guidance on planting, fertiliser, irrigation, growth stages, pests, diseases and harvesting. Try asking a question with one of those topics. Live AI is temporarily unavailable."
         }
     }
     private fun askLive(prompt: String) {
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
-            addBubble("Sign in under Farmer Account to use live AI. Offline maize guidance is available: " + answer(prompt), false)
+            finishReply(prompt, "Sign in under Farmer Account for live AI.\n\n" + answer(prompt), false)
             return
         }
-        addBubble("MaizeMate is thinking…", false)
+        thinkingRow = addBubble("MaizeMate is thinking…", false)
         user.getIdToken(false).addOnSuccessListener { result ->
             val token = result.token
             if (token.isNullOrBlank()) {
-                addBubble("Could not verify your account. " + answer(prompt), false)
+                finishReply(prompt, "Could not verify your account.\n\n" + answer(prompt), false)
                 return@addOnSuccessListener
             }
+            val context = buildString {
+                append("Current farmer question: ").append(prompt)
+                if (history.isNotEmpty()) {
+                    append("\n\nRecent conversation for context:\n")
+                    history.forEach { (q, a) ->
+                        append("Farmer: ").append(q.take(350)).append("\n")
+                        append("MaizeMate: ").append(a.take(600)).append("\n")
+                    }
+                }
+                append("\nGive a clear, practical answer. Keep it concise (roughly 150 words) unless more detail is requested.")
+            }.take(3000)
             thread {
                 var conn: HttpURLConnection? = null
                 val reply = try {
@@ -111,31 +143,31 @@ class MaizeAiActivity : Activity() {
                     conn.doOutput = true
                     conn.setRequestProperty("Content-Type", "application/json")
                     conn.setRequestProperty("Authorization", "Bearer " + token)
-                    conn.outputStream.use { it.write(JSONObject().put("message", prompt).toString().toByteArray(Charsets.UTF_8)) }
+                    conn.outputStream.use { it.write(JSONObject().put("message", context).toString().toByteArray(Charsets.UTF_8)) }
                     val status = conn.responseCode
                     if (status in 200..299) {
-                        val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
-                        json.optString("reply").ifBlank { "MaizeMate could not generate an answer." }
+                        JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                            .optString("reply").ifBlank { "MaizeMate could not generate an answer." }
                     } else {
-                        val details = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-                        val error = runCatching { JSONObject(details).optString("error") }.getOrDefault("")
-                        "Live AI unavailable (" + status + "). " + error + "\\n\\nOffline guidance: " + answer(prompt)
+                        "Live AI unavailable (" + status + ").\n\nOffline guidance: " + answer(prompt)
                     }
-                } catch (e: Exception) {
-                    "Connection unavailable. Offline guidance: " + answer(prompt)
+                } catch (_: Exception) {
+                    "Connection unavailable.\n\nOffline guidance: " + answer(prompt)
                 } finally {
                     conn?.disconnect()
                 }
-                runOnUiThread { addBubble(reply, false) }
+                runOnUiThread { finishReply(prompt, reply, !reply.startsWith("Live AI unavailable") && !reply.startsWith("Connection unavailable")) }
             }
         }.addOnFailureListener {
-            addBubble("Could not verify your sign-in. Offline guidance: " + answer(prompt), false)
+            finishReply(prompt, "Could not verify your sign-in.\n\n" + answer(prompt), false)
         }
     }
 
     private fun submit() {
+        if (busy) return
         val prompt = question.text.toString().trim()
         if (prompt.isEmpty()) return
+        busy = true
         question.setText("")
         addBubble(prompt, true)
         askLive(prompt)
@@ -192,7 +224,7 @@ class MaizeAiActivity : Activity() {
         }
         scroll.addView(conversation)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        addBubble("Hi! I'm MaizeMate 🌽🤖\\n\\nAsk me about maize plants, kernels, crop diseases or grain insects. Sign in to use live AI. Offline guidance is available if the connection fails. Photo diagnosis is not available yet.", false)
+        addBubble("Hi! I'm MaizeMate 🌽🤖\n\nAsk me about maize plants, kernels, crop diseases or grain insects. Sign in to use live AI. Offline guidance is available if the connection fails. Photo diagnosis is not available yet.", false)
 
         val suggestions = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
