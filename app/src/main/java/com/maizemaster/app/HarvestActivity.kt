@@ -61,7 +61,7 @@ class HarvestActivity : Activity() {
             return
         }
         trips.edit().putString("${id}_active", stamp()).putFloat("${id}_cutting_width", 6f).putFloat("${id}_gps_meters", 0f)
-            .putInt("${id}_gps_points", 0).remove("${id}_gps_error").apply()
+            .putInt("${id}_gps_points", 0).putString("${id}_gps_route", "[]").remove("${id}_gps_error").apply()
         try {
             startForegroundService(Intent(this, HarvestGpsService::class.java).apply {
                 action = HarvestGpsService.ACTION_START
@@ -283,6 +283,7 @@ class HarvestActivity : Activity() {
                         put("hectares", h)
                         put("gpsMeters", meters)
                         put("gpsMovements", points)
+                        put("route", JSONArray(trips.getString("${field.id}_gps_route", "[]")))
                         put("estimatedTonsFromYield", h * field.expectedYield)
                         put("cuttingWidth", width.text.toString().toDoubleOrNull() ?: 0.0)
                     })
