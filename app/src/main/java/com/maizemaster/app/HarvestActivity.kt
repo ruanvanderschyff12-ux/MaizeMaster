@@ -26,12 +26,20 @@ class HarvestActivity : Activity() {
     private var pendingField: String? = null
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val gpsLabels = mutableMapOf<String, TextView>()
+    private val gpsFields = mutableMapOf<String, SavedField>()
     private val refreshGps = object : Runnable {
         override fun run() {
             for ((id, label) in gpsLabels) {
-                label.text = String.format(Locale.US, "📍 GPS distance: %.2f km • %d valid movements",
-                    trips.getFloat("${id}_gps_meters", 0f) / 1000.0,
-                    trips.getInt("${id}_gps_points", 0))
+                val meters = trips.getFloat("${id}_gps_meters", 0f).toDouble()
+                val points = trips.getInt("${id}_gps_points", 0)
+                val field = gpsFields[id]
+                val width = trips.getFloat("${id}_cutting_width", 6f).toDouble()
+                val remaining = field?.let { (it.hectares() - it.harvestedHectares).coerceAtLeast(0.0) } ?: 0.0
+                val area = if (points >= 2) (meters * width / 10000.0).coerceAtMost(remaining) else 0.0
+                val tonnes = area * (field?.expectedYield ?: 0.0)
+                label.text = String.format(Locale.US,
+                    "📍 GPS: %.2f km • %d movements\n🌾 Live estimate: %.3f ha • %.2f t\nCutting width: %.1f m (adjust at trip end)",
+                    meters / 1000.0, points, area, tonnes, width)
             }
             refreshHandler.postDelayed(this, 3000L)
         }
@@ -52,7 +60,7 @@ class HarvestActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 602)
             return
         }
-        trips.edit().putString("${id}_active", stamp()).putFloat("${id}_gps_meters", 0f)
+        trips.edit().putString("${id}_active", stamp()).putFloat("${id}_cutting_width", 6f).putFloat("${id}_gps_meters", 0f)
             .putInt("${id}_gps_points", 0).remove("${id}_gps_error").apply()
         try {
             startForegroundService(Intent(this, HarvestGpsService::class.java).apply {
@@ -107,6 +115,7 @@ class HarvestActivity : Activity() {
 
     private fun render() {
         gpsLabels.clear()
+        gpsFields.clear()
         window.statusBarColor = forest
         window.navigationBarColor = forest
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(244, 249, 245)) }
@@ -170,6 +179,7 @@ class HarvestActivity : Activity() {
             if (active != null) {
                 val gpsLabel = label("Waiting for GPS signal...", 14f)
                 gpsLabels[field.id] = gpsLabel
+                gpsFields[field.id] = field
                 card.addView(gpsLabel)
             }
             if (active != null) trips.getString("${field.id}_gps_error", null)?.let {
@@ -206,7 +216,7 @@ class HarvestActivity : Activity() {
                 append("Completed trips: ${entries.length()}\n")
                 for (i in entries.length() - 1 downTo maxOf(0, entries.length() - 5)) {
                     val entry = entries.getJSONObject(i)
-                    append("${entry.optString("end")}  •  ${entry.optDouble("tons")} t  •  ${entry.optDouble("hectares")} ha\n")
+                    append(String.format(Locale.US, "%s • %.2f t • %.3f ha • %.2f km\n", entry.optString("end"), entry.optDouble("tons"), entry.optDouble("hectares"), entry.optDouble("gpsMeters") / 1000.0))
                 }
             }, 14f))
         }
@@ -220,7 +230,7 @@ class HarvestActivity : Activity() {
         val meters = trips.getFloat("${field.id}_gps_meters", 0f).toDouble()
         val points = trips.getInt("${field.id}_gps_points", 0)
         val remaining = (field.hectares() - field.harvestedHectares).coerceAtLeast(0.0)
-        val width = number("Combine cutting width (metres)").apply { setText("6.0") }
+        val width = number("Combine cutting width (metres)").apply { setText(trips.getFloat("${field.id}_cutting_width", 6f).toString()) }
         val hectares = number("Estimated hectares")
         val tons = number("Estimated or measured tonnes")
         val guidance = label("GPS estimates are approximate; adjust before saving.", 13f)
@@ -229,6 +239,7 @@ class HarvestActivity : Activity() {
             val area = if (points >= 2 && w in 0.1..30.0) (meters * w / 10000.0).coerceAtMost(remaining) else 0.0
             hectares.setText(String.format(Locale.US, "%.3f", area))
             tons.setText(String.format(Locale.US, "%.2f", area * field.expectedYield))
+            if (w in 0.1..30.0) trips.edit().putFloat("${field.id}_cutting_width", w.toFloat()).apply()
             guidance.text = String.format(Locale.US, "GPS: %.2f km, %d movements. Area: %.3f ha. Check overlaps and measured load weight.", meters / 1000.0, points, area)
         }
         width.addTextChangedListener(object : android.text.TextWatcher {
@@ -271,6 +282,8 @@ class HarvestActivity : Activity() {
                         put("tons", t)
                         put("hectares", h)
                         put("gpsMeters", meters)
+                        put("gpsMovements", points)
+                        put("estimatedTonsFromYield", h * field.expectedYield)
                         put("cuttingWidth", width.text.toString().toDoubleOrNull() ?: 0.0)
                     })
                     trips.edit()
