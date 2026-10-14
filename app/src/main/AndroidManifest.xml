@@ -15,6 +15,7 @@
 
         <activity android:name=".GrowthActivity" android:exported="false" />
         <activity android:name=".HarvestActivity" android:exported="false" />
+        <activity android:name=".FieldBoundaryActivity" android:exported="false" />
         <service android:name=".HarvestGpsService" android:exported="false" android:foregroundServiceType="location" />
         <activity android:name=".KnowledgeActivity" android:exported="false" />
 
