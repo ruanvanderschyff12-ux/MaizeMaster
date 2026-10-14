@@ -124,6 +124,7 @@ object FieldCloudBackup {
     } catch (_: Exception) { null }
 
     private var refreshInProgress = false
+    private var lastConflict: String? = null
     fun refreshFromCloud(activity: Activity, onUpdated: () -> Unit) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val prefs = activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE)
@@ -167,6 +168,9 @@ object FieldCloudBackup {
                 }
                 // Both copies changed, or this is an older installation without a baseline.
                 // Never overwrite either copy without the farmer's explicit choice.
+                val conflictKey = uid + localVersion + remoteVersion
+                if (lastConflict == conflictKey) return@addOnCompleteListener
+                lastConflict = conflictKey
                 android.app.AlertDialog.Builder(activity)
                     .setTitle("Field sync conflict")
                     .setMessage("Fields changed on this phone and in the cloud. Nothing was replaced. Keep your local fields, or download the cloud copy. Downloading replaces this phone's field list.")
