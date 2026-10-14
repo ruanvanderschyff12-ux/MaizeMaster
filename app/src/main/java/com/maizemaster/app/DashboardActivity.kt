@@ -50,6 +50,7 @@ class DashboardActivity : Activity() {
     private fun openWeather() = startActivity(Intent(this, WeatherActivity::class.java))
     private fun openGrowth() = startActivity(Intent(this, GrowthActivity::class.java))
     private fun openHarvest() = startActivity(Intent(this, HarvestActivity::class.java))
+    private fun openMaizeAi() = startActivity(Intent(this, MaizeAiActivity::class.java))
     private fun openKnowledge() = startActivity(Intent(this, KnowledgeActivity::class.java))
     private fun unavailable(title: String) {
         AlertDialog.Builder(this).setTitle(title)
@@ -148,11 +149,13 @@ class DashboardActivity : Activity() {
             Triple("🌱", "Growth Stages", "Follow crop growth") to { openGrowth() },
             Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields() },
             Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { DiseaseGuide.show(this) },
-            Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openHarvest() }
+            Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openHarvest() },
+            Triple("🤖", "Maize AI Assistant", "Ask maize farming questions") to { openMaizeAi() }
         )
-        for (i in 0 until 3) {
+        for (i in 0 until (items.size + 1) / 2) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             for (j in 0 until 2) {
+                if (i * 2 + j >= items.size) continue
                 val item = items[i * 2 + j]
                 row.addView(tile(item.first.first, item.first.second, item.first.third, item.second),
                     LinearLayout.LayoutParams(0, -2, 1f).apply {
