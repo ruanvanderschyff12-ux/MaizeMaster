@@ -11,6 +11,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
 
 class DashboardActivity : Activity() {
     private val dark = Color.rgb(8, 65, 40)
@@ -19,6 +20,8 @@ class DashboardActivity : Activity() {
     private val storage by lazy { FieldStorage(this) }
     private lateinit var fieldArea: LinearLayout
     private lateinit var summary: TextView
+    private lateinit var accountStatus: TextView
+    private lateinit var accountButton: Button
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density + .5f).toInt()
     private fun shape(color: Int, radius: Int = 15) = GradientDrawable().apply {
@@ -125,10 +128,12 @@ class DashboardActivity : Activity() {
 
         val account = panel()
         account.addView(label("👨‍🌾 Farmer Account", 19f, true))
-        account.addView(label("Register or sign in securely. Your saved fields stay on this phone until cloud sync is enabled.", 13f))
-        account.addView(button("Farmer login / register  ›") {
+        accountStatus = label("Checking account...", 13f)
+        account.addView(accountStatus)
+        accountButton = button("Farmer login / register  ›") {
             startActivity(Intent(this, FarmerAccountActivity::class.java))
-        })
+        }
+        account.addView(accountButton)
         account.addView(button("Back up fields to cloud") {
             AlertDialog.Builder(this).setTitle("Back up saved fields?")
                 .setMessage("This uploads your fields to your signed-in account and replaces your previous cloud backup. Your local fields remain unchanged.")
@@ -216,6 +221,11 @@ class DashboardActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::summary.isInitialized) refresh()
+        if (::accountButton.isInitialized) {
+            val user = FirebaseAuth.getInstance().currentUser
+            accountButton.text = if (user == null) "Farmer login / register  ›" else "Signed in ✓  •  Manage account"
+            accountStatus.text = if (user == null) "Sign in to enable cloud backup and restore." else "Signed in as " + (user.email ?: "Farmer") + ". Fields sync automatically after your first cloud backup."
+        }
         WeatherAutoSync.refresh(this)
     }
 
