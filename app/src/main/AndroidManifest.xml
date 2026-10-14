@@ -13,6 +13,7 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <activity android:name=".MaizeAiActivity" android:exported="false" />
         <activity android:name=".GrowthActivity" android:exported="false" />
         <activity android:name=".HarvestActivity" android:exported="false" />
         <activity android:name=".FieldBoundaryActivity" android:exported="false" />
