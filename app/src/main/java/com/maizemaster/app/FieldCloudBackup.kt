@@ -11,11 +11,29 @@ object FieldCloudBackup {
     private const val OWNER_KEY = "cloud_backup_owner_uid"
 
     private const val BASELINE_KEY = "cloud_sync_baseline"
+    // Stable field serialization: HashMap iteration order must never create false conflicts.
     private fun encoded(fields: List<SavedField>): String =
-        org.json.JSONArray(fields.map { org.json.JSONObject(fieldToMap(it)) }).toString()
+        fields.joinToString("|") { field ->
+            fieldToMap(field).toSortedMap().entries.joinToString(";") { (key, value) ->
+                key + "=" + org.json.JSONObject.quote(value.toString())
+            }
+        }
 
-    private fun baseline(prefs: SharedPreferences, uid: String): String? =
-        prefs.getString(BASELINE_KEY + uid, null)
+    private fun baseline(prefs: SharedPreferences, uid: String): String? {
+        val stored = prefs.getString(BASELINE_KEY + uid, null) ?: return null
+        if (!stored.startsWith("[")) return stored
+        // Upgrade the baseline written by the previous APK without losing its meaning.
+        return try {
+            val array = org.json.JSONArray(stored)
+            val maps = (0 until array.length()).map { array.getJSONObject(it) }
+            maps.joinToString("|") { obj ->
+                val keys = obj.keys().asSequence().toList().sorted()
+                keys.joinToString(";") { key ->
+                    key + "=" + org.json.JSONObject.quote(obj.get(key).toString())
+                }
+            }
+        } catch (_: Exception) { null }
+    }
 
     private fun setBaseline(prefs: SharedPreferences, uid: String, fields: List<SavedField>) {
         prefs.edit().putString(BASELINE_KEY + uid, encoded(fields)).apply()
