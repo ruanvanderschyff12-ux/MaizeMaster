@@ -191,6 +191,7 @@ class HarvestActivity : Activity() {
                     fieldShape = field.shape
                     fieldWidth = field.width
                     fieldLength = field.length
+                    cuttingWidth = trips.getFloat("${field.id}_cutting_width", 6f).toDouble()
                 }
                 routeViews[field.id] = map
                 card.addView(map, LinearLayout.LayoutParams(-1, dp(230)).apply {
