@@ -232,7 +232,25 @@ class MainActivity : Activity() {
         }
         layout.addView(content)
 
-                // FARM OVERVIEW
+                // Dedicated pages: only the selected section is visible.
+        val homePage = vertical()
+        val designerPage = vertical()
+        val plantingPage = vertical()
+        val estimatePage = vertical()
+        val fieldsPage = vertical()
+        val pages = listOf(homePage, designerPage, plantingPage, estimatePage, fieldsPage)
+        val pageNames = listOf("Home", "Field Designer", "Planting Details", "Harvest Estimate", "My Fields")
+        val navigation = card()
+        navigation.addView(heading("🌽 MaizeMaster sections"))
+        val pageSelector = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item, pageNames)
+        }
+        navigation.addView(pageSelector)
+        content.addView(navigation)
+        pages.forEach { content.addView(it) }
+
+        // FARM OVERVIEW
 
         val overview = card()
         overview.addView(heading("Farm overview"))
@@ -268,23 +286,6 @@ class MainActivity : Activity() {
         )
         homePage.addView(weatherCard)
 
-        // Dedicated pages: only the selected section is visible.
-        val homePage = vertical()
-        val designerPage = vertical()
-        val plantingPage = vertical()
-        val estimatePage = vertical()
-        val fieldsPage = vertical()
-        val pages = listOf(homePage, designerPage, plantingPage, estimatePage, fieldsPage)
-        val pageNames = listOf("Home", "Field Designer", "Planting Details", "Harvest Estimate", "My Fields")
-        val navigation = card()
-        navigation.addView(heading("🌽 MaizeMaster sections"))
-        val pageSelector = Spinner(this).apply {
-            adapter = ArrayAdapter(this@MainActivity,
-                android.R.layout.simple_spinner_dropdown_item, pageNames)
-        }
-        navigation.addView(pageSelector)
-        content.addView(navigation)
-        pages.forEach { content.addView(it) }
         fun showPage(index: Int) {
             pages.forEachIndexed { i, section ->
                 section.visibility = if (i == index) View.VISIBLE else View.GONE
