@@ -116,6 +116,9 @@ class MaizeAiActivity : Activity() {
         val entry = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         question = EditText(this).apply {
             hint = "Ask about your maize..."
+            setTextColor(dark)
+            setHintTextColor(Color.rgb(95, 110, 101))
+            backgroundTintList = android.content.res.ColorStateList.valueOf(green)
             setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_SEND
             setOnEditorActionListener { _, actionId, _ ->
@@ -129,6 +132,7 @@ class MaizeAiActivity : Activity() {
             setOnClickListener { submit() }
         })
         root.addView(entry)
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContentView(root)
     }
 }
