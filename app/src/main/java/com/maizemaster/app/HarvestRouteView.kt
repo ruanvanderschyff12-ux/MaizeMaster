@@ -28,6 +28,8 @@ class HarvestRouteView(context: Context) : View(context) {
         set(value) { field = value.coerceIn(0.5, 30.0); invalidate() }
     var previousRoutes = JSONArray()
         set(value) { field = value; invalidate() }
+    var livePosition = JSONArray()
+        set(value) { field = value; invalidate() }
     var route = JSONArray()
         set(value) { field = value; invalidate() }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -157,6 +159,19 @@ class HarvestRouteView(context: Context) : View(context) {
         }
         if (boundaryPoints.size < 3) {
             drawMaizeField(canvas)
+            // Without a surveyed boundary, show a location indicator separately.
+            // Do not pretend the GPS fix is georeferenced inside the designer field.
+            if (livePosition.length() >= 2) {
+                val d = resources.displayMetrics.density
+                paint.style = Paint.Style.FILL
+                paint.color = Color.rgb(0, 101, 208)
+                canvas.drawCircle(width - 25f*d, 25f*d, 9f*d, paint)
+                paint.color = Color.WHITE
+                canvas.drawCircle(width - 25f*d, 25f*d, 4f*d, paint)
+                paint.color = Color.rgb(16, 78, 60)
+                paint.textSize = 11f*d
+                canvas.drawText("GPS fix (field not aligned)", 12f*d, 24f*d, paint)
+            }
             canvas.restore()
             return
         }
@@ -182,6 +197,17 @@ class HarvestRouteView(context: Context) : View(context) {
         }
         drawMaizeField(canvas, gpsOutline)
         if (points.isEmpty()) {
+            if (livePosition.length() >= 2) {
+                val lat = livePosition.optDouble(0, Double.NaN)
+                val lon = livePosition.optDouble(1, Double.NaN)
+                if (lat.isFinite() && lon.isFinite()) {
+                    val px = (width / 2.0 + (lon - lonCenter) * 111320.0 * factor * scale).toFloat()
+                    val py = (height / 2.0 - (lat - latCenter) * 111320.0 * scale).toFloat()
+                    paint.style = Paint.Style.FILL
+                    paint.color = Color.rgb(0, 108, 226)
+                    canvas.drawCircle(px, py, 9f * resources.displayMetrics.density, paint)
+                }
+            }
             canvas.restore()
             return
         }
@@ -245,6 +271,16 @@ class HarvestRouteView(context: Context) : View(context) {
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(10, 76, 46)
         canvas.drawCircle(x(points.lastIndex), y(points.lastIndex), 8f * resources.displayMetrics.density, paint)
+        if (livePosition.length() >= 2) {
+            val lat = livePosition.optDouble(0, Double.NaN)
+            val lon = livePosition.optDouble(1, Double.NaN)
+            if (lat.isFinite() && lon.isFinite()) {
+                paint.color = Color.rgb(0, 108, 226)
+                canvas.drawCircle((width / 2.0 + (lon - lonCenter) * 111320.0 * factor * scale).toFloat(),
+                    (height / 2.0 - (lat - latCenter) * 111320.0 * scale).toFloat(),
+                    9f * resources.displayMetrics.density, paint)
+            }
+        }
         canvas.restore()
     }
 }
