@@ -239,7 +239,7 @@ class MainActivity : Activity() {
 
         val overviewText = text("", 15f, forest, true)
         overview.addView(overviewText)
-        content.addView(overview)
+        homePage.addView(overview)
 
         // WEATHER
 
@@ -266,7 +266,49 @@ class MainActivity : Activity() {
                 }
             }
         )
-        content.addView(weatherCard)
+        homePage.addView(weatherCard)
+
+        // Dedicated pages: only the selected section is visible.
+        val homePage = vertical()
+        val designerPage = vertical()
+        val plantingPage = vertical()
+        val estimatePage = vertical()
+        val fieldsPage = vertical()
+        val pages = listOf(homePage, designerPage, plantingPage, estimatePage, fieldsPage)
+        val pageNames = listOf("Home", "Field Designer", "Planting Details", "Harvest Estimate", "My Fields")
+        val navigation = card()
+        navigation.addView(heading("🌽 MaizeMaster sections"))
+        val pageSelector = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item, pageNames)
+        }
+        navigation.addView(pageSelector)
+        content.addView(navigation)
+        pages.forEach { content.addView(it) }
+        fun showPage(index: Int) {
+            pages.forEachIndexed { i, section ->
+                section.visibility = if (i == index) View.VISIBLE else View.GONE
+            }
+            scroll.post { scroll.smoothScrollTo(0, 0) }
+        }
+        pageSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                showPage(position)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        fun navigateTo(index: Int) {
+            if (pageSelector.selectedItemPosition == index) showPage(index)
+            else pageSelector.setSelection(index)
+        }
+        homePage.addView(card().apply {
+            addView(heading("Manage your maize farm"))
+            addView(text("Choose a section below to work on it without the other forms in the way.", 14f, muted))
+            listOf("🌱 Field Designer" to 1, "🚜 Planting Details" to 2,
+                "📊 Harvest Estimate" to 3, "🌾 My Saved Fields" to 4).forEach { (label, index) ->
+                addView(button(label).apply { setOnClickListener { navigateTo(index) } })
+            }
+        })
 
         // FIELD DESIGNER
 
@@ -355,7 +397,7 @@ class MainActivity : Activity() {
 
         fieldCard.addView(widthInput)
         fieldCard.addView(lengthInput)
-        content.addView(fieldCard)
+        designerPage.addView(fieldCard)
 
         // PLANTING DETAILS
 
@@ -389,7 +431,7 @@ class MainActivity : Activity() {
 
         val yieldInput = input("Expected tons per hectare")
         plantingCard.addView(yieldInput)
-        content.addView(plantingCard)
+        plantingPage.addView(plantingCard)
 
         // HARVEST ESTIMATE
 
@@ -407,7 +449,7 @@ class MainActivity : Activity() {
         val calculateButton = button("Calculate harvest")
         estimateCard.addView(calculateButton)
         estimateCard.addView(result)
-        content.addView(estimateCard)
+        estimatePage.addView(estimateCard)
 
         // FIELD MANAGEMENT
 
@@ -437,7 +479,7 @@ class MainActivity : Activity() {
         management.addView(saveButton)
         management.addView(updateButton)
         management.addView(newButton)
-        content.addView(management)
+        designerPage.addView(management)
 
         // SAVED FIELDS
 
@@ -448,7 +490,7 @@ class MainActivity : Activity() {
 
         val fieldList = vertical()
         savedCard.addView(fieldList)
-        content.addView(savedCard)
+        fieldsPage.addView(savedCard)
 
         // FIELD SHAPE
 
@@ -588,7 +630,7 @@ class MainActivity : Activity() {
 
             editingLabel.text = "Editing: ${field.name}"
             showCalculation(field)
-            scroll.smoothScrollTo(0, 0)
+            navigateTo(1)
         }
 
         // RECORD HARVEST
@@ -1353,11 +1395,12 @@ class MainActivity : Activity() {
                 "Ready to create a new field."
             )
 
-            scroll.smoothScrollTo(0, 0)
+            navigateTo(1)
         }
 
         // INITIAL DASHBOARD
 
         refreshList()
+        showPage(0)
     }
 }
