@@ -66,7 +66,7 @@ class FarmerAccountActivity : Activity() {
             } else {
                 status.text = "Signing in..."
                 auth.signInWithEmailAndPassword(address, pass).addOnCompleteListener(this) { task ->
-                    if (task.isSuccessful) finish()
+                    if (task.isSuccessful) { FieldCloudBackup.syncOnSignIn(this); finish() }
                     else status.text = task.exception?.localizedMessage ?: "Sign in failed."
                 }
             }
