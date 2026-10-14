@@ -123,6 +123,14 @@ class DashboardActivity : Activity() {
         }
         body.addView(content)
 
+        val account = panel()
+        account.addView(label("👨‍🌾 Farmer Account", 19f, true))
+        account.addView(label("Register or sign in securely. Your saved fields stay on this phone until cloud sync is enabled.", 13f))
+        account.addView(button("Farmer login / register  ›") {
+            startActivity(Intent(this, FarmerAccountActivity::class.java))
+        })
+        content.addView(account, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+
         val weather = panel()
         weather.addView(label("☀️  Weather & maize risks", 19f, true))
         weather.addView(label("See your local forecast and how conditions can affect maize.", 13f).apply {
