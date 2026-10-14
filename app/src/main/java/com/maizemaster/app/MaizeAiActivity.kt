@@ -90,7 +90,7 @@ class MaizeAiActivity : Activity() {
             setBackgroundColor(pale)
             setPadding(dp(14), dp(14), dp(14), dp(12))
         }
-        root.addView(text("🌽 Maize AI Assistant", 23f, true))
+        root.addView(text("🌽 MaizeMate", 23f, true))
         root.addView(text("Built-in maize guidance • Offline mode", 13f).apply {
             setPadding(0, dp(4), 0, dp(10))
         })
