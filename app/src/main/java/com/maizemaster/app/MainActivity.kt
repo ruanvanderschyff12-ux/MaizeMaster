@@ -194,7 +194,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::refreshList.isInitialized) refreshList()
+        if (::refreshList.isInitialized) {
+            refreshList()
+            FieldCloudBackup.refreshFromCloud(this) { refreshList() }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
