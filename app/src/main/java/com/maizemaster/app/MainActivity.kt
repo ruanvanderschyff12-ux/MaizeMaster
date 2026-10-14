@@ -17,7 +17,6 @@ import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
-import org.json.JSONArray
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
