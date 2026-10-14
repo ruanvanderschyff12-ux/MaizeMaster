@@ -53,25 +53,31 @@ class HarvestRouteView(context: Context) : View(context) {
             MotionEvent.ACTION_DOWN -> {
                 lastX = event.x
                 lastY = event.y
+                // At normal zoom, let the surrounding ScrollView handle swipes.
+                if (zoom <= 1f) return false
+                parent?.requestDisallowInterceptTouchEvent(true)
+                return true
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (!zoomDetector.isInProgress && event.pointerCount == 1) {
+                if (!zoomDetector.isInProgress && event.pointerCount == 1 && zoom > 1f) {
                     panX += event.x - lastX
                     panY += event.y - lastY
                     invalidate()
                 }
                 lastX = event.x
                 lastY = event.y
-                return true
+                return zoom > 1f || zoomDetector.isInProgress
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 parent?.requestDisallowInterceptTouchEvent(false)
-                return true
+                return zoom > 1f
             }
         }
-        return true
+        return zoom > 1f || zoomDetector.isInProgress
     }
 
     private fun drawMaizeField(canvas: Canvas, outline: Path? = null) {
