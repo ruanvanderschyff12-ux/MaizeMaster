@@ -20,6 +20,8 @@ class HarvestRouteView(context: Context) : View(context) {
         set(value) { field = value.coerceAtLeast(1.0); invalidate() }
     var fieldLength = 300.0
         set(value) { field = value.coerceAtLeast(1.0); invalidate() }
+    var cuttingWidth = 6.0
+        set(value) { field = value.coerceIn(0.5, 30.0); invalidate() }
     var route = JSONArray()
         set(value) { field = value; invalidate() }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -135,14 +137,28 @@ class HarvestRouteView(context: Context) : View(context) {
         fun x(i: Int) = (width / 2.0 + east[i] * scale).toFloat()
         fun y(i: Int) = (height / 2.0 - north[i] * scale).toFloat()
         drawMaizeField(canvas)
+        val pad = 16f * resources.displayMetrics.density
+        val fit = minOf((width - 2f * pad) / fieldWidth.toFloat(),
+            (height - 2f * pad) / (if (fieldShape == "Circle") fieldWidth else fieldLength).toFloat())
+        val fieldW = fieldWidth.toFloat() * fit
+        val fieldH = (if (fieldShape == "Circle") fieldWidth else fieldLength).toFloat() * fit
+        val bounds = RectF((width - fieldW) / 2f, (height - fieldH) / 2f,
+            (width + fieldW) / 2f, (height + fieldH) / 2f)
+        val boundary = Path().apply {
+            if (fieldShape == "Oval" || fieldShape == "Circle") addOval(bounds, Path.Direction.CW)
+            else addRect(bounds, Path.Direction.CW)
+        }
+        canvas.save()
+        canvas.clipPath(boundary)
         val path = Path()
         path.moveTo(x(0), y(0))
         for (i in 1 until points.size) path.lineTo(x(i), y(i))
         paint.color = Color.rgb(143, 99, 57)
-        paint.strokeWidth = 18f * resources.displayMetrics.density
+        paint.strokeWidth = (cuttingWidth.toFloat() * fit).coerceAtLeast(2f)
         paint.style = Paint.Style.STROKE
         paint.strokeCap = Paint.Cap.ROUND
         canvas.drawPath(path, paint)
+        canvas.restore()
         paint.color = Color.rgb(23, 144, 71)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 7f * resources.displayMetrics.density
