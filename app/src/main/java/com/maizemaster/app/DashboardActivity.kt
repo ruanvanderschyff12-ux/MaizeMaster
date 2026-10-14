@@ -150,7 +150,7 @@ class DashboardActivity : Activity() {
             Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields() },
             Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { DiseaseGuide.show(this) },
             Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openHarvest() },
-            Triple("🤖", "Maize AI Assistant", "Ask maize farming questions") to { openMaizeAi() }
+            Triple("🤖", "MaizeMate", "Ask maize farming questions") to { openMaizeAi() }
         )
         for (i in 0 until (items.size + 1) / 2) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
