@@ -9,6 +9,11 @@ import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.widget.*
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.concurrent.thread
 
 /**
  * Built-in maize guidance. This is intentionally not presented as a live AI model.
@@ -83,12 +88,57 @@ class MaizeAiActivity : Activity() {
                 "🌽 I can offer built-in guidance on planting, fertiliser, irrigation, growth stages, pests, diseases and harvesting. Try asking a question with one of those topics. This version does not yet connect to a live AI model."
         }
     }
+    private fun askLive(prompt: String) {
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            addBubble("Sign in under Farmer Account to use live AI. Offline maize guidance is available: " + answer(prompt), false)
+            return
+        }
+        addBubble("MaizeMate is thinking…", false)
+        user.getIdToken(false).addOnSuccessListener { result ->
+            val token = result.token
+            if (token.isNullOrBlank()) {
+                addBubble("Could not verify your account. " + answer(prompt), false)
+                return@addOnSuccessListener
+            }
+            thread {
+                var conn: HttpURLConnection? = null
+                val reply = try {
+                    conn = URL("https://maizemate-api-production.up.railway.app/chat").openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.connectTimeout = 12000
+                    conn.readTimeout = 32000
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.setRequestProperty("Authorization", "Bearer " + token)
+                    conn.outputStream.use { it.write(JSONObject().put("message", prompt).toString().toByteArray(Charsets.UTF_8)) }
+                    val status = conn.responseCode
+                    if (status in 200..299) {
+                        val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                        json.optString("reply").ifBlank { "MaizeMate could not generate an answer." }
+                    } else {
+                        val details = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                        val error = runCatching { JSONObject(details).optString("error") }.getOrDefault("")
+                        "Live AI unavailable (" + status + "). " + error + "\\n\\nOffline guidance: " + answer(prompt)
+                    }
+                } catch (e: Exception) {
+                    "Connection unavailable. Offline guidance: " + answer(prompt)
+                } finally {
+                    conn?.disconnect()
+                }
+                runOnUiThread { addBubble(reply, false) }
+            }
+        }.addOnFailureListener {
+            addBubble("Could not verify your sign-in. Offline guidance: " + answer(prompt), false)
+        }
+    }
+
     private fun submit() {
         val prompt = question.text.toString().trim()
         if (prompt.isEmpty()) return
         question.setText("")
         addBubble(prompt, true)
-        addBubble(answer(prompt), false)
+        askLive(prompt)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,7 +167,7 @@ class MaizeAiActivity : Activity() {
             setTextColor(gold)
             letterSpacing = 0.08f
         })
-        branding.addView(text("●  Offline guidance", 12f).apply {
+        branding.addView(text("●  Live AI + offline guidance", 12f).apply {
             setTextColor(Color.rgb(202, 237, 210))
             setPadding(0, dp(6), 0, 0)
         })
@@ -142,7 +192,7 @@ class MaizeAiActivity : Activity() {
         }
         scroll.addView(conversation)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        addBubble("Hi! I'm MaizeMate 🌽🤖\\n\\nAsk me about maize plants, kernels, crop diseases or grain insects. For now I provide built-in guidance; live AI and photo diagnosis are coming later.", false)
+        addBubble("Hi! I'm MaizeMate 🌽🤖\\n\\nAsk me about maize plants, kernels, crop diseases or grain insects. Sign in to use live AI. Offline guidance is available if the connection fails. Photo diagnosis is not available yet.", false)
 
         val suggestions = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
