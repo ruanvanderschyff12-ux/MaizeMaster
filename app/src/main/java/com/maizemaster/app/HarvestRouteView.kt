@@ -68,7 +68,7 @@ class HarvestRouteView(context: Context) : View(context) {
         return true
     }
 
-    private fun drawMaizeField(canvas: Canvas) {
+    private fun drawMaizeField(canvas: Canvas, outline: Path? = null) {
         val pad = 16f * resources.displayMetrics.density
         val availableW = (width - pad * 2).coerceAtLeast(1f)
         val availableH = (height - pad * 2).coerceAtLeast(1f)
@@ -85,9 +85,9 @@ class HarvestRouteView(context: Context) : View(context) {
         }
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(128, 90, 52)
-        canvas.drawPath(boundary, paint)
+        canvas.drawPath(outline ?: boundary, paint)
         canvas.save()
-        canvas.clipPath(boundary)
+        canvas.clipPath(outline ?: boundary)
         val spacing = 19f * resources.displayMetrics.density
         var x = bounds.left + spacing / 2
         while (x < bounds.right) {
@@ -123,11 +123,6 @@ class HarvestRouteView(context: Context) : View(context) {
             val lon = item.optDouble(1, Double.NaN)
             if (lat.isFinite() && lon.isFinite()) points.add(lat to lon)
         }
-        if (points.isEmpty()) {
-            drawMaizeField(canvas)
-            canvas.restore()
-            return
-        }
         val boundaryPoints = mutableListOf<Pair<Double, Double>>()
         for (i in 0 until gpsBoundary.length()) {
             val item = gpsBoundary.optJSONArray(i) ?: continue
@@ -152,7 +147,6 @@ class HarvestRouteView(context: Context) : View(context) {
         val scale = (minOf(width, height) * 0.8) / extent
         fun x(i: Int) = (width / 2.0 + east[i] * scale).toFloat()
         fun y(i: Int) = (height / 2.0 - north[i] * scale).toFloat()
-        drawMaizeField(canvas)
         val gpsOutline = Path().apply {
             for (i in boundaryPoints.indices) {
                 val px = (width / 2.0 + boundaryEast[i] * scale).toFloat()
@@ -160,6 +154,11 @@ class HarvestRouteView(context: Context) : View(context) {
                 if (i == 0) moveTo(px, py) else lineTo(px, py)
             }
             close()
+        }
+        drawMaizeField(canvas, gpsOutline)
+        if (points.isEmpty()) {
+            canvas.restore()
+            return
         }
         val pad = 16f * resources.displayMetrics.density
         val fit = minOf((width - 2f * pad) / fieldWidth.toFloat(),
