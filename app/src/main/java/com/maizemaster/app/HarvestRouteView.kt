@@ -16,6 +16,8 @@ import kotlin.math.max
 class HarvestRouteView(context: Context) : View(context) {
     var gpsBoundary = JSONArray()
         set(value) { field = value; invalidate() }
+    var rowSpacing = 0.75
+        set(value) { field = value.coerceAtLeast(0.1); invalidate() }
     var fieldShape = "Rectangle"
         set(value) { field = value; invalidate() }
     var fieldWidth = 200.0
@@ -77,10 +79,8 @@ class HarvestRouteView(context: Context) : View(context) {
         val displayH = (height - 2f * pad).coerceAtLeast(1f)
         val actualW = fieldWidth.coerceAtLeast(1.0)
         val actualH = if (fieldShape == "Circle") actualW else fieldLength.coerceAtLeast(1.0)
-        // Rotate long schematic fields to use the available landscape map area.
-        val rotate = outline == null && actualH > actualW * 1.3 && displayW > displayH
-        val worldW = if (rotate) actualH else actualW
-        val worldH = if (rotate) actualW else actualH
+        val worldW = actualW
+        val worldH = actualH
         val fit = minOf(displayW / worldW, displayH / worldH).toFloat()
         val drawW = worldW.toFloat() * fit
         val drawH = worldH.toFloat() * fit
@@ -100,29 +100,31 @@ class HarvestRouteView(context: Context) : View(context) {
         canvas.drawPath(shapePath, paint)
         canvas.save()
         canvas.clipPath(shapePath)
-        val spacing = (minOf(bounds.width(), bounds.height()) / 12f).coerceIn(7f * density, 17f * density)
+        val displayRows = kotlin.math.min(16, kotlin.math.max(2, kotlin.math.ceil(actualW / rowSpacing).toInt()))
+        val spacing = bounds.width() / displayRows.coerceAtLeast(1)
         // Alternating soil tracks make rows readable at different zoom levels.
-        var row = bounds.top + spacing * 0.5f
-        while (row < bounds.bottom) {
+        var row = bounds.left + spacing * 0.5f
+        while (row < bounds.right) {
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = spacing * 0.56f
             paint.color = Color.rgb(45, 113, 43)
-            canvas.drawLine(bounds.left, row, bounds.right, row, paint)
-            var plantX = bounds.left + spacing * 0.5f
-            while (plantX < bounds.right) {
+            canvas.drawLine(row, bounds.top, row, bounds.bottom, paint)
+            val plantGap = bounds.height() / kotlin.math.min(26, kotlin.math.max(2, (bounds.height() / 14f).toInt()))
+            var plantX = bounds.top + plantGap * 0.5f
+            while (plantX < bounds.bottom) {
                 val r = spacing * 0.44f
                 paint.style = Paint.Style.FILL
                 paint.color = Color.rgb(24, 102, 37)
-                canvas.drawOval(RectF(plantX-r, row-r*0.25f, plantX+r, row+r*0.25f), paint)
-                canvas.drawOval(RectF(plantX-r*0.25f, row-r, plantX+r*0.25f, row+r), paint)
+                canvas.drawOval(RectF(row-r, plantX-r*0.25f, row+r, plantX+r*0.25f), paint)
+                canvas.drawOval(RectF(row-r*0.25f, plantX-r, row+r*0.25f, plantX+r), paint)
                 paint.color = Color.rgb(105, 187, 55)
-                canvas.drawOval(RectF(plantX-r*0.83f, row-r*0.20f, plantX+r*0.83f, row+r*0.20f), paint)
-                canvas.drawOval(RectF(plantX-r*0.20f, row-r*0.83f, plantX+r*0.20f, row+r*0.83f), paint)
+                canvas.drawOval(RectF(row-r*0.83f, plantX-r*0.20f, row+r*0.83f, plantX+r*0.20f), paint)
+                canvas.drawOval(RectF(row-r*0.20f, plantX-r*0.83f, row+r*0.20f, plantX+r*0.83f), paint)
                 paint.color = Color.rgb(224, 186, 65)
-                canvas.drawCircle(plantX, row, r*0.14f, paint)
-                plantX += spacing * 1.15f
+                canvas.drawCircle(row, plantX, r*0.14f, paint)
+                plantX += plantGap
             }
-            row += spacing * 1.12f
+            row += spacing
         }
         canvas.restore()
         paint.style = Paint.Style.STROKE
