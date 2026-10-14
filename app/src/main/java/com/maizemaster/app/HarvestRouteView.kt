@@ -7,6 +7,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import org.json.JSONArray
 import kotlin.math.cos
 import kotlin.math.max
@@ -15,6 +17,46 @@ class HarvestRouteView(context: Context) : View(context) {
     var route = JSONArray()
         set(value) { field = value; invalidate() }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var zoom = 1f
+    private var panX = 0f
+    private var panY = 0f
+    private var lastX = 0f
+    private var lastY = 0f
+    private val zoomDetector = ScaleGestureDetector(context,
+        object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                zoom = (zoom * detector.scaleFactor).coerceIn(1f, 8f)
+                invalidate()
+                return true
+            }
+        })
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        zoomDetector.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                lastX = event.x
+                lastY = event.y
+                parent?.requestDisallowInterceptTouchEvent(true)
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!zoomDetector.isInProgress && event.pointerCount == 1) {
+                    panX += event.x - lastX
+                    panY += event.y - lastY
+                    invalidate()
+                }
+                lastX = event.x
+                lastY = event.y
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+                return true
+            }
+        }
+        return true
+    }
 
     private fun drawMaizeField(canvas: Canvas) {
         val pad = 16f * resources.displayMetrics.density
@@ -48,6 +90,10 @@ class HarvestRouteView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(Color.rgb(231, 243, 231))
+        canvas.save()
+        canvas.translate(width / 2f + panX, height / 2f + panY)
+        canvas.scale(zoom, zoom)
+        canvas.translate(-width / 2f, -height / 2f)
         val points = mutableListOf<Pair<Double, Double>>()
         for (i in 0 until route.length()) {
             val item = route.optJSONArray(i) ?: continue
@@ -57,6 +103,7 @@ class HarvestRouteView(context: Context) : View(context) {
         }
         if (points.isEmpty()) {
             drawMaizeField(canvas)
+            canvas.restore()
             return
         }
         val latCenter = points.map { it.first }.average()
@@ -86,5 +133,6 @@ class HarvestRouteView(context: Context) : View(context) {
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(10, 76, 46)
         canvas.drawCircle(x(points.lastIndex), y(points.lastIndex), 8f * resources.displayMetrics.density, paint)
+        canvas.restore()
     }
 }
