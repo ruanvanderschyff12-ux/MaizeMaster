@@ -181,6 +181,15 @@ class HarvestActivity : Activity() {
                 setPadding(0, dp(12), 0, dp(14))
             })
             card.addView(label(if (active != null) "🚜 Trip started: $active" else "No active harvest trip", 14f))
+            card.addView(Button(this).apply {
+                isAllCaps = false
+                text = "📍 Record field GPS boundary"
+                setOnClickListener {
+                    startActivity(Intent(this@HarvestActivity, FieldBoundaryActivity::class.java).apply {
+                        putExtra("field_id", field.id)
+                    })
+                }
+            })
             if (active != null) {
                 val gpsLabel = label("Waiting for GPS signal...", 14f)
                 gpsLabels[field.id] = gpsLabel
