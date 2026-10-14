@@ -530,10 +530,12 @@ class MainActivity : Activity() {
                 lengthInput.text.toString().toDoubleOrNull()
             }
 
-            val row = rowInput.text.toString().toDoubleOrNull()
-            val plant = plantInput.text.toString().toDoubleOrNull()
+            // Planting details are optional when a field is first created.
+            // Defaults allow saving dimensions before visiting the Planting page.
+            val row = rowInput.text.toString().trim().ifEmpty { "0.75" }.toDoubleOrNull()
+            val plant = plantInput.text.toString().trim().ifEmpty { "0.25" }.toDoubleOrNull()
             val yieldRate =
-                yieldInput.text.toString().toDoubleOrNull()
+                yieldInput.text.toString().trim().ifEmpty { "0" }.toDoubleOrNull()
 
             if (
                 name.isBlank() ||
