@@ -282,6 +282,53 @@ class MainActivity : Activity() {
         }
 
         fieldCard.addView(fieldView)
+        val editOutlineButton = button("✏️ Adjust GPS field outline", true)
+        val saveOutlineButton = button("💾 Save adjusted outline")
+        val cancelOutlineButton = button("Cancel outline changes", true)
+        saveOutlineButton.visibility = View.GONE
+        cancelOutlineButton.visibility = View.GONE
+        fieldCard.addView(editOutlineButton)
+        fieldCard.addView(saveOutlineButton)
+        fieldCard.addView(cancelOutlineButton)
+
+        fun stopOutlineEditing() {
+            fieldView.editingBoundary = false
+            editOutlineButton.visibility = View.VISIBLE
+            saveOutlineButton.visibility = View.GONE
+            cancelOutlineButton.visibility = View.GONE
+        }
+        fun restoreOutline() {
+            fieldView.gpsBoundary = try {
+                JSONArray(getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE)
+                    .getString("${editingId}_boundary", "[]"))
+            } catch (_: Exception) { JSONArray() }
+            stopOutlineEditing()
+        }
+        editOutlineButton.setOnClickListener {
+            if (editingId == null) {
+                message("Select a saved field first.")
+            } else if (fieldView.gpsBoundary.length() < 3) {
+                message("Record the GPS field boundary before adjusting it.")
+            } else {
+                fieldView.editingBoundary = true
+                editOutlineButton.visibility = View.GONE
+                saveOutlineButton.visibility = View.VISIBLE
+                cancelOutlineButton.visibility = View.VISIBLE
+                message("Drag blue points to adjust the boundary. Save when finished.")
+            }
+        }
+        saveOutlineButton.setOnClickListener {
+            val id = editingId
+            if (id != null && fieldView.gpsBoundary.length() >= 3) {
+                val saved = getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE)
+                    .edit().putString("${id}_boundary", fieldView.gpsBoundary.toString()).commit()
+                if (saved) {
+                    stopOutlineEditing()
+                    message("GPS field outline saved.")
+                } else message("Could not save boundary.")
+            }
+        }
+        cancelOutlineButton.setOnClickListener { restoreOutline() }
 
         val nameInput = input("Field name", false)
         fieldCard.addView(nameInput)
@@ -520,6 +567,7 @@ class MainActivity : Activity() {
         // EDIT FIELD
 
         fun openField(field: SavedField) {
+            stopOutlineEditing()
             editingId = field.id
 
             nameInput.setText(field.name)
@@ -1276,6 +1324,8 @@ class MainActivity : Activity() {
         // CLEAR / NEW FIELD
 
         newButton.setOnClickListener {
+            stopOutlineEditing()
+            fieldView.gpsBoundary = JSONArray()
             editingId = null
 
             nameInput.setText("")
