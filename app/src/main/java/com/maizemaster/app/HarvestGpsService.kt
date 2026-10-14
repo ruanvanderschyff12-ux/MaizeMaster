@@ -89,7 +89,7 @@ class HarvestGpsService : Service(), LocationListener {
             preferences.edit().putString("${id}_gps_error", "Waiting for a stronger GPS signal. Try outdoors.").apply()
             return
         }
-        preferences.edit().remove("${id}_gps_error").apply()
+        preferences.edit().remove("${id}_gps_error").putString("${id}_live_position", JSONArray().put(location.latitude).put(location.longitude).toString()).apply()
         val last = previous
         previous = location
         if (last == null) {
