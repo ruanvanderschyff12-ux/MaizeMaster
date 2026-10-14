@@ -16,6 +16,7 @@ import android.widget.*
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import org.json.JSONArray
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -501,6 +502,10 @@ class MainActivity : Activity() {
             fieldView.fieldLength = field.length.toFloat()
             fieldView.rowSpacing = field.rowSpacing.toFloat()
             fieldView.fieldShape = field.shape
+            fieldView.gpsBoundary = try {
+                JSONArray(getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE)
+                    .getString("${field.id}_boundary", "[]"))
+            } catch (_: Exception) { JSONArray() }
             fieldView.growthDays = daysSince(field.plantingDate)?.toInt()?.coerceAtLeast(0) ?: 0
 
             result.text =
