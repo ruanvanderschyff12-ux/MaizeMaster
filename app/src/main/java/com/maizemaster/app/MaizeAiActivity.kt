@@ -17,7 +17,8 @@ import java.util.Locale
 class MaizeAiActivity : Activity() {
     private val dark = Color.rgb(12, 78, 49)
     private val green = Color.rgb(28, 137, 57)
-    private val pale = Color.rgb(242, 249, 242)
+    private val pale = Color.rgb(244, 248, 245)
+    private val gold = Color.rgb(245, 189, 59)
     private lateinit var conversation: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var question: EditText
@@ -85,62 +86,115 @@ class MaizeAiActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = dark
         window.navigationBarColor = dark
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(pale)
-            setPadding(dp(14), dp(14), dp(14), dp(12))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
         }
-        root.addView(text("🌽 MaizeMate", 23f, true))
-        root.addView(text("Built-in maize guidance • Offline mode", 13f).apply {
-            setPadding(0, dp(4), 0, dp(10))
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = background(dark)
+            setPadding(dp(10), dp(10), dp(12), dp(10))
+        }
+        header.addView(MaizeMateMascot(this), LinearLayout.LayoutParams(dp(80), dp(80)))
+        val branding = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, 0)
+        }
+        branding.addView(text("MaizeMate", 26f, true).apply { setTextColor(Color.WHITE) })
+        branding.addView(text("YOUR MAIZE SPECIALIST", 11f, true).apply {
+            setTextColor(gold)
+            letterSpacing = 0.08f
         })
-        scroll = ScrollView(this).apply { isFillViewport = true }
-        conversation = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        branding.addView(text("●  Offline guidance", 12f).apply {
+            setTextColor(Color.rgb(202, 237, 210))
+            setPadding(0, dp(6), 0, 0)
+        })
+        header.addView(branding, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+
+        val section = text("MAIZE • KERNELS • DISEASES • GRAIN INSECTS", 10f, true).apply {
+            setTextColor(green)
+            letterSpacing = 0.04f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(3), 0, dp(10))
+        }
+        root.addView(section)
+
+        scroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+        }
+        conversation = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(3), dp(6), dp(3), dp(6))
+        }
         scroll.addView(conversation)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        addBubble("Welcome to MaizeMaster! Ask a maize farming question. These are general built-in tips, not live AI or a field diagnosis.", false)
-        val suggestions = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        addBubble("Hi! I'm MaizeMate 🌽🤖\\n\\nAsk me about maize plants, kernels, crop diseases or grain insects. For now I provide built-in guidance; live AI and photo diagnosis are coming later.", false)
+
+        val suggestions = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            setPadding(0, dp(6), 0, dp(7))
+        }
         val choices = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("Maize growth stages", "Yellow leaves", "Irrigation advice", "Harvest tips").forEach { topic ->
-            choices.addView(Button(this).apply {
+        listOf("🌽 Maize growth", "🍃 Yellow leaves", "🛡️ Maize diseases", "🐛 Grain insects", "🌾 Kernel quality").forEach { topic ->
+            choices.addView(TextView(this).apply {
                 text = topic
-                isAllCaps = false
+                textSize = 13f
+                setTextColor(dark)
+                background = background(Color.WHITE)
+                setPadding(dp(14), dp(12), dp(14), dp(12))
                 setOnClickListener {
                     question.setText(topic)
                     submit()
                 }
-            })
+            }, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(8) })
         }
         suggestions.addView(choices)
         root.addView(suggestions)
-        val entry = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+
+        val entry = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = background(Color.WHITE)
+            setPadding(dp(9), dp(5), dp(7), dp(5))
+            elevation = dp(3).toFloat()
+        }
         question = EditText(this).apply {
-            hint = "Ask about your maize..."
+            hint = "Ask MaizeMate..."
+            textSize = 15f
             setTextColor(dark)
-            setHintTextColor(Color.rgb(95, 110, 101))
-            backgroundTintList = android.content.res.ColorStateList.valueOf(green)
+            setHintTextColor(Color.rgb(100, 117, 107))
+            setBackgroundColor(Color.TRANSPARENT)
             setSingleLine(true)
             imeOptions = EditorInfo.IME_ACTION_SEND
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_SEND) { submit(); true } else false
             }
         }
-        entry.addView(question, LinearLayout.LayoutParams(0, -2, 1f))
-        entry.addView(Button(this).apply {
-            text = "Send"
-            isAllCaps = false
+        entry.addView(question, LinearLayout.LayoutParams(0, dp(48), 1f))
+        entry.addView(TextView(this).apply {
+            text = "➤"
+            textSize = 24f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = background(green)
+            contentDescription = "Send message"
             setOnClickListener { submit() }
-        })
+        }, LinearLayout.LayoutParams(dp(49), dp(46)))
         root.addView(entry)
-        // Edge-to-edge layouts on newer Android versions may not resize for the IME.
-        // Apply the keyboard inset to the bottom composer so it stays above the keyboard.
+
+        // Keep the composer above Samsung/Android keyboards, including edge-to-edge layouts.
         val baseBottom = dp(12)
-        root.setPadding(dp(14), dp(14), dp(14), baseBottom)
         root.setOnApplyWindowInsetsListener { _, insets ->
             val keyboard = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
             val navigation = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
             val extra = (keyboard - navigation).coerceAtLeast(0)
-            root.setPadding(dp(14), dp(14), dp(14), baseBottom + extra)
+            root.setPadding(dp(14), dp(12), dp(14), baseBottom + extra)
             insets
         }
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
