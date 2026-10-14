@@ -129,6 +129,13 @@ class DashboardActivity : Activity() {
         account.addView(button("Farmer login / register  ›") {
             startActivity(Intent(this, FarmerAccountActivity::class.java))
         })
+        account.addView(button("Back up fields to cloud") {
+            AlertDialog.Builder(this).setTitle("Back up saved fields?")
+                .setMessage("This uploads your fields to your signed-in account and replaces your previous cloud backup. Your local fields remain unchanged.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Back up") { _, _ -> FieldCloudBackup.backup(this) }
+                .show()
+        })
         content.addView(account, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
         val weather = panel()
