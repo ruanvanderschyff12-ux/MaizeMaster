@@ -30,6 +30,69 @@ object FieldCloudBackup {
         "growthObservedDate" to f.growthObservedDate
     )
 
+    /**
+     * New-phone onboarding: download only when there are no local fields.
+     * Never overwrite another account's or an existing phone's fields silently.
+     */
+    fun syncOnSignIn(activity: Activity) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val prefs = activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE)
+        val owner = prefs.getString(OWNER_KEY, null)
+        if (owner == uid) return
+        val local = FieldStorage(activity).loadFields()
+        if (local.isNotEmpty()) {
+            android.app.AlertDialog.Builder(activity)
+                .setTitle("Fields already on this phone")
+                .setMessage("This phone contains ${local.size} saved fields. They have not been replaced or uploaded. Use Cloud Restore to download your account's fields, or back up the phone's fields only if they belong to your account.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        FirebaseFirestore.getInstance().collection("farmers").document(uid)
+            .collection("backups").document("fields").get(com.google.firebase.firestore.Source.SERVER)
+            .addOnSuccessListener { snapshot ->
+                if (FirebaseAuth.getInstance().currentUser?.uid != uid) return@addOnSuccessListener
+                if (FieldStorage(activity).loadFields().isNotEmpty()) return@addOnSuccessListener
+                val raw = snapshot.get("fields") as? List<*>
+                if (raw == null) {
+                    Toast.makeText(activity, "No cloud fields yet. Your new fields can be backed up from this phone.", Toast.LENGTH_LONG).show()
+                    return@addOnSuccessListener
+                }
+                val restored = parseCloudFields(raw)
+                if (restored == null) {
+                    Toast.makeText(activity, "Cloud fields could not be read", Toast.LENGTH_LONG).show()
+                    return@addOnSuccessListener
+                }
+                if (FieldStorage(activity).saveFields(restored)) {
+                    prefs.edit().putString(OWNER_KEY, uid).apply()
+                    Toast.makeText(activity, "${restored.size} fields downloaded from your account. Automatic upload enabled.", Toast.LENGTH_LONG).show()
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(activity, "Cloud download unavailable. Local fields are safe; try Cloud Restore later.", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun parseCloudFields(raw: List<*>): List<SavedField>? = try {
+        raw.map { entry ->
+            val m = entry as Map<*, *>
+            fun s(key: String) = m[key] as? String ?: ""
+            fun d(key: String) = (m[key] as? Number)?.toDouble() ?: 0.0
+            SavedField(
+                id = s("id").also { require(it.isNotBlank()) },
+                name = s("name"), shape = s("shape"),
+                width = d("width"), length = d("length"),
+                rowSpacing = d("rowSpacing"), plantSpacing = d("plantSpacing"),
+                maizeVariety = s("maizeVariety"), expectedYield = d("expectedYield"),
+                harvestedHectares = d("harvestedHectares"), harvestedTons = d("harvestedTons"),
+                plantingDate = s("plantingDate"),
+                maturityDays = (m["maturityDays"] as? Number)?.toInt() ?: 0,
+                growthStage = s("growthStage"), growthNotes = s("growthNotes"),
+                growthObservedDate = s("growthObservedDate")
+            )
+        }
+    } catch (_: Exception) { null }
+
     fun backup(activity: Activity) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid == null) {
@@ -63,25 +126,8 @@ object FieldCloudBackup {
                     Toast.makeText(activity, "No cloud backup found", Toast.LENGTH_LONG).show()
                     return@addOnSuccessListener
                 }
-                val fields = try {
-                    raw.map { entry ->
-                        val m = entry as Map<*, *>
-                        fun s(key: String) = m[key] as? String ?: ""
-                        fun d(key: String) = (m[key] as? Number)?.toDouble() ?: 0.0
-                        SavedField(
-                            id = s("id").also { require(it.isNotBlank()) },
-                            name = s("name"), shape = s("shape"),
-                            width = d("width"), length = d("length"),
-                            rowSpacing = d("rowSpacing"), plantSpacing = d("plantSpacing"),
-                            maizeVariety = s("maizeVariety"), expectedYield = d("expectedYield"),
-                            harvestedHectares = d("harvestedHectares"), harvestedTons = d("harvestedTons"),
-                            plantingDate = s("plantingDate"),
-                            maturityDays = (m["maturityDays"] as? Number)?.toInt() ?: 0,
-                            growthStage = s("growthStage"), growthNotes = s("growthNotes"),
-                            growthObservedDate = s("growthObservedDate")
-                        )
-                    }
-                } catch (e: Exception) {
+                val fields = parseCloudFields(raw)
+                if (fields == null) {
                     Toast.makeText(activity, "Invalid cloud backup", Toast.LENGTH_LONG).show()
                     return@addOnSuccessListener
                 }
