@@ -92,16 +92,32 @@ class HarvestGpsService : Service(), LocationListener {
         preferences.edit().remove("${id}_gps_error").apply()
         val last = previous
         previous = location
-        if (last == null) return
+        if (last == null) {
+            saveRoutePoint(id, location)
+            return
+        }
         val seconds = (location.elapsedRealtimeNanos - last.elapsedRealtimeNanos) / 1e9
         if (seconds <= 0 || seconds > 90) return
         val meters = last.distanceTo(location).toDouble()
         if (meters < 3.0 || meters > 30.0 * seconds) return
+        saveRoutePoint(id, location)
         val current = preferences.getFloat("${id}_gps_meters", 0f)
         preferences.edit()
             .putFloat("${id}_gps_meters", (current + meters).toFloat())
             .putInt("${id}_gps_points", preferences.getInt("${id}_gps_points", 0) + 1)
             .apply()
+    }
+
+    private fun saveRoutePoint(id: String, location: Location) {
+        try {
+            val key = "${id}_gps_route"
+            val route = JSONArray(preferences.getString(key, "[]"))
+            if (route.length() >= 3000) return
+            route.put(JSONArray().put(location.latitude).put(location.longitude))
+            preferences.edit().putString(key, route.toString()).apply()
+        } catch (_: Exception) {
+            preferences.edit().putString("${id}_gps_error", "Unable to save GPS route").apply()
+        }
     }
 
     private fun stopTracking() {
