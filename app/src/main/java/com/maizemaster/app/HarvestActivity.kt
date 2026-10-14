@@ -202,6 +202,7 @@ class HarvestActivity : Activity() {
                     fieldLength = field.length
                     cuttingWidth = trips.getFloat("${field.id}_cutting_width", 6f).toDouble()
                     gpsBoundary = try { JSONArray(getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE).getString("${field.id}_boundary", "[]")) } catch (_: Exception) { JSONArray() }
+                    previousRoutes = history(field.id)
                 }
                 routeViews[field.id] = map
                 card.addView(map, LinearLayout.LayoutParams(-1, dp(230)).apply {
