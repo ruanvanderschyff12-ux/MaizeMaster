@@ -187,7 +187,11 @@ class HarvestActivity : Activity() {
                 gpsFields[field.id] = field
                 card.addView(gpsLabel)
                 card.addView(label("LIVE GPS HARVEST ROUTE", 13f, true))
-                val map = HarvestRouteView(this)
+                val map = HarvestRouteView(this).apply {
+                    fieldShape = field.shape
+                    fieldWidth = field.width
+                    fieldLength = field.length
+                }
                 routeViews[field.id] = map
                 card.addView(map, LinearLayout.LayoutParams(-1, dp(230)).apply {
                     topMargin = dp(8)
