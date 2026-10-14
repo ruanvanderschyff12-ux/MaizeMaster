@@ -24,6 +24,8 @@ class HarvestRouteView(context: Context) : View(context) {
         set(value) { field = value.coerceAtLeast(1.0); invalidate() }
     var cuttingWidth = 6.0
         set(value) { field = value.coerceIn(0.5, 30.0); invalidate() }
+    var previousRoutes = JSONArray()
+        set(value) { field = value; invalidate() }
     var route = JSONArray()
         set(value) { field = value; invalidate() }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -173,17 +175,39 @@ class HarvestRouteView(context: Context) : View(context) {
         }
         canvas.save()
         canvas.clipPath(gpsOutline)
+        paint.style = Paint.Style.STROKE
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.color = Color.rgb(143, 99, 57)
+        for (j in 0 until previousRoutes.length()) {
+            val trip = previousRoutes.optJSONObject(j) ?: continue
+            val savedRoute = trip.optJSONArray("route") ?: continue
+            val oldPath = Path()
+            var count = 0
+            for (k in 0 until savedRoute.length()) {
+                val coord = savedRoute.optJSONArray(k) ?: continue
+                val lat = coord.optDouble(0, Double.NaN)
+                val lon = coord.optDouble(1, Double.NaN)
+                if (!lat.isFinite() || !lon.isFinite()) continue
+                val px = (width / 2.0 + (lon - lonCenter) * 111320.0 * factor * scale).toFloat()
+                val py = (height / 2.0 - (lat - latCenter) * 111320.0 * scale).toFloat()
+                if (count++ == 0) oldPath.moveTo(px, py) else oldPath.lineTo(px, py)
+            }
+            if (count > 1) {
+                paint.strokeWidth = (trip.optDouble("cuttingWidth", 6.0).coerceIn(0.5, 30.0) * scale).toFloat().coerceAtLeast(1f)
+                canvas.drawPath(oldPath, paint)
+            }
+        }
         val path = Path()
         path.moveTo(x(0), y(0))
         for (i in 1 until points.size) path.lineTo(x(i), y(i))
         paint.color = Color.rgb(143, 99, 57)
-        paint.strokeWidth = (cuttingWidth.toFloat() * fit).coerceAtLeast(2f)
+        paint.strokeWidth = (cuttingWidth * scale).toFloat().coerceAtLeast(1f)
         paint.style = Paint.Style.STROKE
         paint.strokeCap = Paint.Cap.ROUND
         canvas.drawPath(path, paint)
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(143, 99, 57)
-        val radius = (cuttingWidth.toFloat() * fit / 2f).coerceAtLeast(1f)
+        val radius = (cuttingWidth * scale / 2.0).toFloat().coerceAtLeast(0.5f)
         for (i in points.indices) canvas.drawCircle(x(i), y(i), radius, paint)
         canvas.restore()
         paint.style = Paint.Style.STROKE
