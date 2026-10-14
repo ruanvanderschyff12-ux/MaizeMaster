@@ -27,6 +27,7 @@ class HarvestActivity : Activity() {
     private val refreshHandler = Handler(Looper.getMainLooper())
     private val gpsLabels = mutableMapOf<String, TextView>()
     private val gpsFields = mutableMapOf<String, SavedField>()
+    private val routeViews = mutableMapOf<String, HarvestRouteView>()
     private val refreshGps = object : Runnable {
         override fun run() {
             for ((id, label) in gpsLabels) {
@@ -40,6 +41,9 @@ class HarvestActivity : Activity() {
                 label.text = String.format(Locale.US,
                     "📍 GPS: %.2f km • %d movements\n🌾 Live estimate: %.3f ha • %.2f t\nCutting width: %.1f m (adjust at trip end)",
                     meters / 1000.0, points, area, tonnes, width)
+            }
+            for ((id, view) in routeViews) {
+                view.route = try { JSONArray(trips.getString("${id}_gps_route", "[]")) } catch (_: Exception) { JSONArray() }
             }
             refreshHandler.postDelayed(this, 3000L)
         }
@@ -116,6 +120,7 @@ class HarvestActivity : Activity() {
     private fun render() {
         gpsLabels.clear()
         gpsFields.clear()
+        routeViews.clear()
         window.statusBarColor = forest
         window.navigationBarColor = forest
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(244, 249, 245)) }
@@ -181,6 +186,13 @@ class HarvestActivity : Activity() {
                 gpsLabels[field.id] = gpsLabel
                 gpsFields[field.id] = field
                 card.addView(gpsLabel)
+                card.addView(label("LIVE GPS HARVEST ROUTE", 13f, true))
+                val map = HarvestRouteView(this)
+                routeViews[field.id] = map
+                card.addView(map, LinearLayout.LayoutParams(-1, dp(230)).apply {
+                    topMargin = dp(8)
+                    bottomMargin = dp(12)
+                })
             }
             if (active != null) trips.getString("${field.id}_gps_error", null)?.let {
                 card.addView(label("GPS warning: $it", 13f))
