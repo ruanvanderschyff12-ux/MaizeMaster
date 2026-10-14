@@ -22,6 +22,15 @@ import kotlin.math.min
 class FieldDesignerView(context: Context) : View(context) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    var editingBoundary = false
+        set(value) { field = value; invalidate() }
+    private var activeVertex = -1
+    private var gpsCenterLat = 0.0
+    private var gpsCenterLon = 0.0
+    private var gpsFactor = 1.0
+    private var gpsScale = 1.0
+    private var gpsCenterE = 0.0
+    private var gpsCenterN = 0.0
     private var zoom = 1f
     private var panX = 0f
     private var panY = 0f
@@ -36,22 +45,27 @@ class FieldDesignerView(context: Context) : View(context) {
             }
         })
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        pinch.onTouchEvent(event)
+        if (!editingBoundary) pinch.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                activeVertex = if (editingBoundary) findVertex(event.x, event.y) else -1
                 touchX = event.x; touchY = event.y
                 parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_MOVE -> {
-                if (!pinch.isInProgress && event.pointerCount == 1) {
+                if (editingBoundary && activeVertex >= 0) {
+                    moveVertex(activeVertex, event.x, event.y)
+                } else if (!editingBoundary && !pinch.isInProgress && event.pointerCount == 1) {
                     panX += event.x - touchX
                     panY += event.y - touchY
                     invalidate()
                 }
                 touchX = event.x; touchY = event.y
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                activeVertex = -1
                 parent?.requestDisallowInterceptTouchEvent(false)
+            }
         }
         return true
     }
@@ -147,6 +161,7 @@ class FieldDesignerView(context: Context) : View(context) {
             canvas.scale(zoom, zoom)
             canvas.translate(-width / 2f, -height / 2f)
             canvas.drawBitmap(it, 0f, 0f, paint)
+            if (editingBoundary) drawVertexHandles(canvas)
             canvas.restore()
         }
     }
@@ -265,6 +280,9 @@ class FieldDesignerView(context: Context) : View(context) {
             val lat0 = gpsPoints.map { it.first }.average()
             val lon0 = gpsPoints.map { it.second }.average()
             val factor = cos(Math.toRadians(lat0)).coerceAtLeast(0.01)
+            gpsCenterLat = lat0
+            gpsCenterLon = lon0
+            gpsFactor = factor
             val east = gpsPoints.map { (it.second - lon0) * 111320.0 * factor }
             val north = gpsPoints.map { (it.first - lat0) * 111320.0 }
             val minE = east.minOrNull() ?: 0.0
@@ -275,6 +293,9 @@ class FieldDesignerView(context: Context) : View(context) {
                 availableHeight.toDouble() / (maxN - minN).coerceAtLeast(1.0))
             val centerE = (maxE + minE) / 2.0
             val centerN = (maxN + minN) / 2.0
+            this.gpsScale = gpsScale
+            gpsCenterE = centerE
+            gpsCenterN = centerN
             Path().apply {
                 for (i in gpsPoints.indices) {
                     val px = (width / 2.0 + (east[i] - centerE) * gpsScale).toFloat()
@@ -382,6 +403,57 @@ class FieldDesignerView(context: Context) : View(context) {
 
         paint.style = Paint.Style.FILL
         paint.shader = null
+    }
+
+    private fun pointOnScreen(lat: Double, lon: Double): Pair<Float, Float> {
+        val e = (lon - gpsCenterLon) * 111320.0 * gpsFactor
+        val n = (lat - gpsCenterLat) * 111320.0
+        val x = (width / 2.0 + (e - gpsCenterE) * gpsScale).toFloat()
+        val y = (height / 2.0 - (n - gpsCenterN) * gpsScale).toFloat()
+        return (width / 2f + panX + (x - width / 2f) * zoom) to
+            (height / 2f + panY + (y - height / 2f) * zoom)
+    }
+
+    private fun findVertex(x: Float, y: Float): Int {
+        if (gpsBoundary.length() < 3) return -1
+        var best = -1
+        var distance = 52f * resources.displayMetrics.density
+        for (i in 0 until gpsBoundary.length()) {
+            val p = gpsBoundary.optJSONArray(i) ?: continue
+            val (px, py) = pointOnScreen(p.optDouble(0), p.optDouble(1))
+            val d = kotlin.math.hypot(x - px, y - py)
+            if (d < distance) { distance = d; best = i }
+        }
+        return best
+    }
+
+    private fun moveVertex(index: Int, screenX: Float, screenY: Float) {
+        if (gpsScale <= 0.0 || zoom <= 0f) return
+        val x = width / 2.0 + (screenX - width / 2f - panX) / zoom
+        val y = height / 2.0 + (screenY - height / 2f - panY) / zoom
+        val east = gpsCenterE + (x - width / 2.0) / gpsScale
+        val north = gpsCenterN - (y - height / 2.0) / gpsScale
+        val lat = gpsCenterLat + north / 111320.0
+        val lon = gpsCenterLon + east / (111320.0 * gpsFactor)
+        if (!lat.isFinite() || !lon.isFinite()) return
+        val edited = JSONArray(gpsBoundary.toString())
+        edited.put(index, JSONArray().put(lat).put(lon))
+        gpsBoundary = edited
+    }
+
+    private fun drawVertexHandles(canvas: Canvas) {
+        paint.shader = null
+        paint.style = Paint.Style.FILL
+        for (i in 0 until gpsBoundary.length()) {
+            val p = gpsBoundary.optJSONArray(i) ?: continue
+            val (sx, sy) = pointOnScreen(p.optDouble(0), p.optDouble(1))
+            val x = width / 2f + (sx - width / 2f - panX) / zoom
+            val y = height / 2f + (sy - height / 2f - panY) / zoom
+            paint.color = Color.WHITE
+            canvas.drawCircle(x, y, 9f / zoom, paint)
+            paint.color = Color.rgb(24, 116, 228)
+            canvas.drawCircle(x, y, 6f / zoom, paint)
+        }
     }
 
     override fun onDetachedFromWindow() {
