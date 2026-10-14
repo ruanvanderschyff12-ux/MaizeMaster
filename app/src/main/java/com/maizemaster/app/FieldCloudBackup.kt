@@ -10,13 +10,42 @@ import com.google.firebase.firestore.FirebaseFirestore
 object FieldCloudBackup {
     private const val OWNER_KEY = "cloud_backup_owner_uid"
 
+    private const val BASELINE_KEY = "cloud_sync_baseline"
+    private fun encoded(fields: List<SavedField>): String =
+        org.json.JSONArray(fields.map { org.json.JSONObject(fieldToMap(it)) }).toString()
+
+    private fun baseline(prefs: SharedPreferences, uid: String): String? =
+        prefs.getString(BASELINE_KEY + uid, null)
+
+    private fun setBaseline(prefs: SharedPreferences, uid: String, fields: List<SavedField>) {
+        prefs.edit().putString(BASELINE_KEY + uid, encoded(fields)).apply()
+    }
+
+    // Use a Firestore transaction to prevent stale phones from overwriting newer cloud changes.
     fun syncAfterLocalSave(prefs: SharedPreferences, fields: List<SavedField>) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         if (prefs.getString(OWNER_KEY, null) != uid) return
-        val values = fields.map { fieldToMap(it) }
-        FirebaseFirestore.getInstance().collection("farmers").document(uid)
-            .collection("backups").document("fields").set(mapOf("fields" to values))
-            .addOnFailureListener { android.util.Log.e("MaizeMaster", "Cloud sync failed", it) }
+        val known = baseline(prefs, uid) ?: return
+        val localVersion = encoded(fields)
+        if (localVersion == known) return
+        val doc = FirebaseFirestore.getInstance().collection("farmers").document(uid)
+            .collection("backups").document("fields")
+        FirebaseFirestore.getInstance().runTransaction { transaction ->
+            val snapshot = transaction.get(doc)
+            val raw = snapshot.get("fields") as? List<*>
+            val cloud = raw?.let { parseCloudFields(it) }
+            if (cloud == null || encoded(cloud) != known)
+                throw IllegalStateException("Cloud fields changed on another phone")
+            transaction.set(doc, mapOf("fields" to fields.map { fieldToMap(it) }))
+            true
+        }.addOnSuccessListener {
+            if (FirebaseAuth.getInstance().currentUser?.uid == uid &&
+                prefs.getString(OWNER_KEY, null) == uid) {
+                setBaseline(prefs, uid, fields)
+            }
+        }.addOnFailureListener {
+            android.util.Log.w("MaizeMaster", "Cloud upload held to protect other device edits", it)
+        }
     }
 
     private fun fieldToMap(f: SavedField): Map<String, Any> = mapOf(
@@ -64,6 +93,7 @@ object FieldCloudBackup {
                     return@addOnSuccessListener
                 }
                 if (FieldStorage(activity).saveFields(restored)) {
+                    setBaseline(prefs, uid, restored)
                     prefs.edit().putString(OWNER_KEY, uid).apply()
                     Toast.makeText(activity, "${restored.size} fields downloaded from your account. Automatic upload enabled.", Toast.LENGTH_LONG).show()
                 }
@@ -93,10 +123,7 @@ object FieldCloudBackup {
         }
     } catch (_: Exception) { null }
 
-    // Pull remote changes on return to My Fields, but require consent before replacing local data.
     private var refreshInProgress = false
-    private var lastPromptedVersion: String? = null
-
     fun refreshFromCloud(activity: Activity, onUpdated: () -> Unit) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val prefs = activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE)
@@ -112,28 +139,44 @@ object FieldCloudBackup {
                 val raw = task.result?.get("fields") as? List<*> ?: return@addOnCompleteListener
                 val remote = parseCloudFields(raw) ?: return@addOnCompleteListener
                 val local = FieldStorage(activity).loadFields()
-                val remoteMaps = remote.map { fieldToMap(it) }
-                if (remoteMaps == local.map { fieldToMap(it) }) {
-                    lastPromptedVersion = null
+                val localVersion = encoded(local)
+                val remoteVersion = encoded(remote)
+                val known = baseline(prefs, uid)
+                if (known == null && localVersion == remoteVersion) {
+                    setBaseline(prefs, uid, remote)
                     return@addOnCompleteListener
                 }
-                val version = uid + remoteMaps.toString()
-                if (lastPromptedVersion == version) return@addOnCompleteListener
-                lastPromptedVersion = version
+                if (localVersion == remoteVersion) {
+                    setBaseline(prefs, uid, remote)
+                    return@addOnCompleteListener
+                }
+                if (known == remoteVersion) {
+                    syncAfterLocalSave(prefs, local)
+                    return@addOnCompleteListener
+                }
+                if (known == localVersion) {
+                    // This phone has no outstanding edits. Remote data can be safely applied.
+                    if (FieldStorage(activity).loadFields().let { encoded(it) } == localVersion &&
+                        FirebaseAuth.getInstance().currentUser?.uid == uid &&
+                        FieldStorage(activity).saveFields(remote)) {
+                        setBaseline(prefs, uid, remote)
+                        onUpdated()
+                        Toast.makeText(activity, "Fields synced from your other phone", Toast.LENGTH_SHORT).show()
+                    }
+                    return@addOnCompleteListener
+                }
+                // Both copies changed, or this is an older installation without a baseline.
+                // Never overwrite either copy without the farmer's explicit choice.
                 android.app.AlertDialog.Builder(activity)
-                    .setTitle("Cloud field changes available")
-                    .setMessage("Your account has ${remote.size} cloud fields and this phone has ${local.size} local fields. Downloading will replace this phone's field list. Choose Keep local if you have unsaved-to-cloud changes.")
+                    .setTitle("Field sync conflict")
+                    .setMessage("Fields changed on this phone and in the cloud. Nothing was replaced. Keep your local fields, or download the cloud copy. Downloading replaces this phone's field list.")
                     .setNegativeButton("Keep local", null)
-                    .setPositiveButton("Download cloud fields") { _, _ ->
-                        if (FirebaseAuth.getInstance().currentUser?.uid != uid) return@setPositiveButton
-                        // Recheck local data so we do not overwrite edits made while dialog was open.
-                        if (FieldStorage(activity).loadFields().map { fieldToMap(it) } != local.map { fieldToMap(it) }) {
-                            Toast.makeText(activity, "Local fields changed. Please refresh again.", Toast.LENGTH_LONG).show()
-                            return@setPositiveButton
-                        }
+                    .setPositiveButton("Download cloud") { _, _ ->
+                        if (FirebaseAuth.getInstance().currentUser?.uid != uid ||
+                            encoded(FieldStorage(activity).loadFields()) != localVersion) return@setPositiveButton
                         if (FieldStorage(activity).saveFields(remote)) {
+                            setBaseline(prefs, uid, remote)
                             onUpdated()
-                            Toast.makeText(activity, "Cloud fields downloaded", Toast.LENGTH_LONG).show()
                         }
                     }.show()
             }
@@ -151,7 +194,9 @@ object FieldCloudBackup {
             .collection("backups").document("fields")
             .set(mapOf("fields" to fields))
             .addOnSuccessListener {
-                activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE).edit().putString(OWNER_KEY, uid).apply()
+                val prefs = activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE)
+                prefs.edit().putString(OWNER_KEY, uid).apply()
+                setBaseline(prefs, uid, FieldStorage(activity).loadFields())
                 Toast.makeText(activity, "Fields backed up. Auto sync enabled.", Toast.LENGTH_LONG).show()
             }
             .addOnFailureListener {
@@ -183,7 +228,11 @@ object FieldCloudBackup {
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Restore") { _, _ ->
                         val saved = FieldStorage(activity).saveFields(fields)
-                        if (saved) activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE).edit().putString(OWNER_KEY, uid).apply()
+                        if (saved) {
+                            val prefs = activity.getSharedPreferences("maizemaster_fields", Context.MODE_PRIVATE)
+                            prefs.edit().putString(OWNER_KEY, uid).apply()
+                            setBaseline(prefs, uid, fields)
+                        }
                         Toast.makeText(activity,
                             if (saved) "Fields restored. Reopen My Fields to refresh." else "Restore failed",
                             Toast.LENGTH_LONG).show()
