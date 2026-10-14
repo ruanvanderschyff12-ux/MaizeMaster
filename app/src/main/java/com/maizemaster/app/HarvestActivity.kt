@@ -44,6 +44,7 @@ class HarvestActivity : Activity() {
             }
             for ((id, view) in routeViews) {
                 view.route = try { JSONArray(trips.getString("${id}_gps_route", "[]")) } catch (_: Exception) { JSONArray() }
+                view.livePosition = try { JSONArray(trips.getString("${id}_live_position", "[]")) } catch (_: Exception) { JSONArray() }
             }
             refreshHandler.postDelayed(this, 3000L)
         }
@@ -65,7 +66,7 @@ class HarvestActivity : Activity() {
             return
         }
         trips.edit().putString("${id}_active", stamp()).putFloat("${id}_cutting_width", 6f).putFloat("${id}_gps_meters", 0f)
-            .putInt("${id}_gps_points", 0).putString("${id}_gps_route", "[]").remove("${id}_gps_error").apply()
+            .putInt("${id}_gps_points", 0).putString("${id}_gps_route", "[]").remove("${id}_live_position").remove("${id}_gps_error").apply()
         try {
             startForegroundService(Intent(this, HarvestGpsService::class.java).apply {
                 action = HarvestGpsService.ACTION_START
