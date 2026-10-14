@@ -95,4 +95,60 @@ object FieldCloudBackup {
             }
     }
 
+    fun restore(activity: Activity) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        if (uid == null) {
+            Toast.makeText(activity, "Sign in first", Toast.LENGTH_LONG).show()
+            return
+        }
+        FirebaseFirestore.getInstance().collection("farmers").document(uid)
+            .collection("backups").document("fields").get()
+            .addOnSuccessListener { snapshot ->
+                val records = snapshot.get("fields") as? List<*>
+                if (records == null) {
+                    Toast.makeText(activity, "No cloud backup found", Toast.LENGTH_LONG).show()
+                    return@addOnSuccessListener
+                }
+                val restored = try {
+                    records.map { record ->
+                        val item = record as Map<*, *>
+                        fun s(key: String) = item[key] as? String ?: ""
+                        fun n(key: String) = (item[key] as? Number)?.toDouble() ?: 0.0
+                        SavedField(
+                            id = s("id").also { require(it.isNotBlank()) },
+                            name = s("name"),
+                            shape = s("shape"),
+                            width = n("width"),
+                            length = n("length"),
+                            rowSpacing = n("rowSpacing"),
+                            plantSpacing = n("plantSpacing"),
+                            maizeVariety = s("maizeVariety"),
+                            expectedYield = n("expectedYield"),
+                            harvestedHectares = n("harvestedHectares"),
+                            harvestedTons = n("harvestedTons"),
+                            plantingDate = s("plantingDate"),
+                            maturityDays = (item["maturityDays"] as? Number)?.toInt() ?: 0,
+                            growthStage = s("growthStage"),
+                            growthNotes = s("growthNotes"),
+                            growthObservedDate = s("growthObservedDate")
+                        )
+                    }
+                } catch (error: Exception) {
+                    Toast.makeText(activity, "Cloud backup is invalid", Toast.LENGTH_LONG).show()
+                    return@addOnSuccessListener
+                }
+                android.app.AlertDialog.Builder(activity)
+                    .setTitle("Restore saved fields?")
+                    .setMessage("Replace the fields on this phone with ${restored.size} fields from your account? Back up your current fields first if needed.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Restore") { _, _ ->
+                        val success = FieldStorage(activity).saveFields(restored)
+                        Toast.makeText(activity, if (success) "Fields restored. Reopen the dashboard." else "Restore failed", Toast.LENGTH_LONG).show()
+                    }.show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(activity, "Could not download backup", Toast.LENGTH_LONG).show()
+            }
+    }
+
 }
