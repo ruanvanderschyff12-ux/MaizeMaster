@@ -14,6 +14,8 @@ import kotlin.math.cos
 import kotlin.math.max
 
 class HarvestRouteView(context: Context) : View(context) {
+    var gpsBoundary = JSONArray()
+        set(value) { field = value; invalidate() }
     var fieldShape = "Rectangle"
         set(value) { field = value; invalidate() }
     var fieldWidth = 200.0
@@ -126,17 +128,39 @@ class HarvestRouteView(context: Context) : View(context) {
             canvas.restore()
             return
         }
-        val latCenter = points.map { it.first }.average()
-        val lonCenter = points.map { it.second }.average()
+        val boundaryPoints = mutableListOf<Pair<Double, Double>>()
+        for (i in 0 until gpsBoundary.length()) {
+            val item = gpsBoundary.optJSONArray(i) ?: continue
+            val lat = item.optDouble(0, Double.NaN)
+            val lon = item.optDouble(1, Double.NaN)
+            if (lat.isFinite() && lon.isFinite()) boundaryPoints.add(lat to lon)
+        }
+        if (boundaryPoints.size < 3) {
+            drawMaizeField(canvas)
+            canvas.restore()
+            return
+        }
+        val latCenter = boundaryPoints.map { it.first }.average()
+        val lonCenter = boundaryPoints.map { it.second }.average()
         val factor = cos(Math.toRadians(latCenter)).coerceAtLeast(0.01)
         val east = points.map { (it.second - lonCenter) * 111320.0 * factor }
         val north = points.map { (it.first - latCenter) * 111320.0 }
-        val extent = max(20.0, max((east.maxOrNull() ?: 0.0) - (east.minOrNull() ?: 0.0),
-            (north.maxOrNull() ?: 0.0) - (north.minOrNull() ?: 0.0)))
+        val boundaryEast = boundaryPoints.map { (it.second - lonCenter) * 111320.0 * factor }
+        val boundaryNorth = boundaryPoints.map { (it.first - latCenter) * 111320.0 }
+        val extent = max(20.0, max((boundaryEast.maxOrNull() ?: 0.0) - (boundaryEast.minOrNull() ?: 0.0),
+            (boundaryNorth.maxOrNull() ?: 0.0) - (boundaryNorth.minOrNull() ?: 0.0)))
         val scale = (minOf(width, height) * 0.8) / extent
         fun x(i: Int) = (width / 2.0 + east[i] * scale).toFloat()
         fun y(i: Int) = (height / 2.0 - north[i] * scale).toFloat()
         drawMaizeField(canvas)
+        val gpsOutline = Path().apply {
+            for (i in boundaryPoints.indices) {
+                val px = (width / 2.0 + boundaryEast[i] * scale).toFloat()
+                val py = (height / 2.0 - boundaryNorth[i] * scale).toFloat()
+                if (i == 0) moveTo(px, py) else lineTo(px, py)
+            }
+            close()
+        }
         val pad = 16f * resources.displayMetrics.density
         val fit = minOf((width - 2f * pad) / fieldWidth.toFloat(),
             (height - 2f * pad) / (if (fieldShape == "Circle") fieldWidth else fieldLength).toFloat())
@@ -149,7 +173,7 @@ class HarvestRouteView(context: Context) : View(context) {
             else addRect(bounds, Path.Direction.CW)
         }
         canvas.save()
-        canvas.clipPath(boundary)
+        canvas.clipPath(gpsOutline)
         val path = Path()
         path.moveTo(x(0), y(0))
         for (i in 1 until points.size) path.lineTo(x(i), y(i))
@@ -163,6 +187,10 @@ class HarvestRouteView(context: Context) : View(context) {
         val radius = (cuttingWidth.toFloat() * fit / 2f).coerceAtLeast(1f)
         for (i in points.indices) canvas.drawCircle(x(i), y(i), radius, paint)
         canvas.restore()
+        paint.style = Paint.Style.STROKE
+        paint.color = Color.rgb(20, 90, 45)
+        paint.strokeWidth = 3f * resources.displayMetrics.density
+        canvas.drawPath(gpsOutline, paint)
         paint.color = Color.rgb(23, 144, 71)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 7f * resources.displayMetrics.density
