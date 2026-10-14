@@ -47,7 +47,7 @@ class MaizeAiActivity : Activity() {
         val bubble = text(message, 15f).apply {
             if (!farmer) {
                 val escaped = android.text.TextUtils.htmlEncode(message)
-                val formatted = escaped.replace(Regex("\\*\\*(.+?)\\*\\*"), "<b>$1</b>").replace("\\n", "<br>")
+                val formatted = escaped.replace(Regex("\\*\\*(.+?)\\*\\*"), "<b>$1</b>").replace("\n", "<br>")
                 setText(Html.fromHtml(formatted, Html.FROM_HTML_MODE_COMPACT))
                 setLineSpacing(dp(3).toFloat(), 1f)
             }
