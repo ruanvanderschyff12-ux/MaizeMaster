@@ -13,7 +13,7 @@ object FieldCloudBackup {
     private const val BASELINE_KEY = "cloud_sync_baseline"
     // Stable field serialization: HashMap iteration order must never create false conflicts.
     private fun encoded(fields: List<SavedField>): String =
-        fields.joinToString("|") { field ->
+        fields.sortedBy { it.id }.joinToString("|") { field ->
             fieldToMap(field).toSortedMap().entries.joinToString(";") { (key, value) ->
                 key + "=" + org.json.JSONObject.quote(value.toString())
             }
@@ -26,7 +26,7 @@ object FieldCloudBackup {
         return try {
             val array = org.json.JSONArray(stored)
             val maps = (0 until array.length()).map { array.getJSONObject(it) }
-            maps.joinToString("|") { obj ->
+            maps.sortedBy { it.optString("id") }.joinToString("|") { obj ->
                 val keys = obj.keys().asSequence().toList().sorted()
                 keys.joinToString(";") { key ->
                     key + "=" + org.json.JSONObject.quote(obj.get(key).toString())
@@ -190,7 +190,7 @@ object FieldCloudBackup {
                 if (lastConflict == conflictKey) return@addOnCompleteListener
                 lastConflict = conflictKey
                 android.app.AlertDialog.Builder(activity)
-                    .setTitle("Field sync conflict")
+                    .setTitle(if (known == null) "Connect existing fields to sync" else "Field sync conflict")
                     .setMessage("Fields changed on this phone and in the cloud. Nothing was replaced. Keep your local fields, or download the cloud copy. Downloading replaces this phone's field list.")
                     .setNegativeButton("Keep local", null)
                     .setPositiveButton("Download cloud") { _, _ ->
