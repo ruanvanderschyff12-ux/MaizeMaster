@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "302786318929",
+    "project_id": "maizemate-b7f97",
+    "storage_bucket": "maizemate-b7f97.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:302786318929:android:97ab55dae2425889e99e70",
+        "android_client_info": {
+          "package_name": "com.maizemaster.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4kOUHUIKEUurXCepNRKsOSaSLWSaVIDE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
