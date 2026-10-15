@@ -51,6 +51,16 @@ jobs:
           echo "MAIZEMASTER_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
           keytool -list -keystore "$RUNNER_TEMP/maizemaster-signing/maizemaster-release.jks" -storetype PKCS12 -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > /dev/null
 
+      - name: Install final MaizeMaster launcher icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          unzip -oq MaizeMaster_final_icon_pack.zip 'app/src/main/res/mipmap-*/ic_launcher*.png'
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            test -s "app/src/main/res/mipmap-$density/ic_launcher.png"
+            test -s "app/src/main/res/mipmap-$density/ic_launcher_round.png"
+          done
+
       - name: Build permanently signed MaizeMaster APK
         run: gradle assembleDebug --stacktrace
 
