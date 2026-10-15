@@ -16,7 +16,9 @@ data class SavedField(
     var maturityDays: Int = 0,
     var growthStage: String = "",
     var growthNotes: String = "",
-    var growthObservedDate: String = ""
+    var growthObservedDate: String = "",
+    var rowCount: Int = 0,
+    var rowsHorizontal: Boolean = false
 ) {
     fun hectares(): Double {
         return HarvestCalculator.calculateHectares(
