@@ -39,7 +39,7 @@ class FieldDesignerView(context: Context) : View(context) {
     private val pinch = ScaleGestureDetector(context,
         object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
-                zoom = (zoom * detector.scaleFactor).coerceIn(1f, 8f)
+                zoom = (zoom * detector.scaleFactor).coerceIn(1f, 12f)
                 invalidate()
                 return true
             }
@@ -95,6 +95,14 @@ class FieldDesignerView(context: Context) : View(context) {
                 refreshField()
             }
         }
+
+    var rowCount = 0
+        set(value) { field = value.coerceAtLeast(0); refreshField() }
+    var rowsHorizontal = false
+        set(value) { field = value; refreshField() }
+    fun zoomIn() { zoom = (zoom * 1.5f).coerceAtMost(12f); invalidate() }
+    fun zoomOut() { zoom = (zoom / 1.5f).coerceAtLeast(1f); if (zoom == 1f) { panX = 0f; panY = 0f }; invalidate() }
+    fun resetZoom() { zoom = 1f; panX = 0f; panY = 0f; invalidate() }
 
     var rowSpacing = 0.75f
         set(value) {
@@ -338,59 +346,41 @@ class FieldDesignerView(context: Context) : View(context) {
         canvas.save()
         canvas.clipPath(fieldPath)
 
-        val actualRows = w / rowSpacing
-
-        val displayRows = min(
-            16,
-            max(2, ceil(actualRows).toInt())
-        )
-
-        val rowGap = cropWidth / displayRows
-
-        val plantCount = min(
-            26,
-            max(2, (cropHeight / 14f).toInt())
-        )
-
-        val plantGap = cropHeight / plantCount
-
-        for (i in 0 until displayRows) {
-            val x = cropLeft + (i + 0.5f) * rowGap
-
+        // Render the real number of rows, preserving a top-down maize canopy.
+        val acrossMetres = if (rowsHorizontal) h else w
+        val actualRows = if (rowCount > 0) rowCount else
+            ceil(acrossMetres / rowSpacing).toInt().coerceAtLeast(1)
+        val safeRows = actualRows.coerceIn(1, 100000)
+        val acrossPixels = if (rowsHorizontal) cropHeight else cropWidth
+        val alongPixels = if (rowsHorizontal) cropWidth else cropHeight
+        val rowGap = acrossPixels / safeRows
+        val plantCount = (alongPixels / 13f).toInt().coerceIn(2, 35)
+        val plantGap = alongPixels / plantCount
+        for (i in 0 until safeRows) {
+            val cross = (i + 0.5f) * rowGap
+            val x1 = if (rowsHorizontal) cropLeft else cropLeft + cross
+            val y1 = if (rowsHorizontal) cropTop + cross else cropTop
+            val x2 = if (rowsHorizontal) cropLeft + cropWidth else x1
+            val y2 = if (rowsHorizontal) y1 else cropTop + cropHeight
             paint.style = Paint.Style.STROKE
             paint.color = Color.rgb(75, 48, 28)
-            paint.strokeWidth = max(
-                1.5f,
-                rowGap * 0.18f
-            )
-
-            canvas.drawLine(
-                x,
-                cropTop,
-                x,
-                cropTop + cropHeight,
-                paint
-            )
-
-            for (j in 0 until plantCount) {
-                val y = cropTop + (j + 0.5f) * plantGap
-
-                val plantSize = min(
-                    12f,
-                    min(
-                        rowGap * 0.42f,
-                        plantGap * 0.48f
-                    )
-                )
-
-                if (plantSize > 0.5f && growthDays >= 7) {
-                    drawMaizePlant(
-                        canvas,
-                        x,
-                        y,
-                        plantSize * (growthDays / 100f).coerceIn(0.12f, 1f)
-                    )
+            paint.strokeWidth = max(0.25f, min(3f, rowGap * 0.18f))
+            canvas.drawLine(x1, y1, x2, y2, paint)
+            // Individual maize leaves appear when zooming in.
+            if (rowGap * zoom >= 2f && growthDays >= 7) {
+                for (j in 0 until plantCount) {
+                    val along = (j + 0.5f) * plantGap
+                    val x = if (rowsHorizontal) cropLeft + along else x1
+                    val y = if (rowsHorizontal) y1 else cropTop + along
+                    val size = min(12f, min(rowGap * 0.42f, plantGap * 0.48f))
+                    if (size > 0.3f) drawMaizePlant(canvas, x, y,
+                        size * (growthDays / 100f).coerceIn(0.12f, 1f))
                 }
+            } else {
+                paint.style = Paint.Style.STROKE
+                paint.color = Color.rgb(35, 123, 43)
+                paint.strokeWidth = max(0.25f, min(rowGap * 0.8f, 3f))
+                canvas.drawLine(x1, y1, x2, y2, paint)
             }
         }
 
