@@ -11,6 +11,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
 
 class DashboardActivity : Activity() {
     private val dark = Color.rgb(8, 65, 40)
@@ -19,6 +20,7 @@ class DashboardActivity : Activity() {
     private val storage by lazy { FieldStorage(this) }
     private lateinit var fieldArea: LinearLayout
     private lateinit var summary: TextView
+    private lateinit var accountStatus: TextView
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density + .5f).toInt()
     private fun shape(color: Int, radius: Int = 15) = GradientDrawable().apply {
@@ -139,6 +141,15 @@ class DashboardActivity : Activity() {
         field.addView(button("View My Fields  ›") { openFields() })
         content.addView(field, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(17) })
 
+        val accountPanel = panel()
+        accountPanel.addView(label("🔐  Account & Cloud Sync", 19f, true))
+        accountStatus = label("Checking account...", 13f)
+        accountPanel.addView(accountStatus)
+        accountPanel.addView(button("Manage Farmer Account  ›") {
+            startActivity(Intent(this, FarmerAccountActivity::class.java))
+        })
+        content.addView(accountPanel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+
         content.addView(label("Explore MaizeMaster", 20f, true).apply {
             setPadding(dp(3), 0, 0, dp(12))
         })
@@ -200,6 +211,10 @@ class DashboardActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::summary.isInitialized) refresh()
+        if (::accountStatus.isInitialized) {
+            val user = FirebaseAuth.getInstance().currentUser
+            accountStatus.text = if (user == null) "Not signed in — sign in or register to prepare for cloud syncing." else "Signed in: ${user.email ?: "Farmer"} — cloud field sync coming next."
+        }
         WeatherAutoSync.refresh(this)
     }
 
