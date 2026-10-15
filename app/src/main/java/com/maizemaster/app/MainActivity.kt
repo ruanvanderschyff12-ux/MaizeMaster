@@ -432,18 +432,25 @@ class MainActivity : Activity() {
         fieldCard.addView(directionSelector)
         val rowStatus = text("", 13f, forest)
         fieldCard.addView(rowStatus)
+        val previewHandler = android.os.Handler(android.os.Looper.getMainLooper())
+        var previewTask: Runnable? = null
         fun updateRowPreview() {
             val row = rowInput.text.toString().toFloatOrNull() ?: 0.75f
             val across = if (directionSelector.selectedItemPosition == 1)
                 (lengthInput.text.toString().toFloatOrNull() ?: 300f)
                 else (widthInput.text.toString().toFloatOrNull() ?: 200f)
             val count = rowCountInput.text.toString().toIntOrNull() ?: 0
-            fieldView.rowSpacing = row.coerceAtLeast(0.1f)
-            fieldView.rowCount = count
-            fieldView.rowsHorizontal = directionSelector.selectedItemPosition == 1
+            previewTask?.let { previewHandler.removeCallbacks(it) }
+            val task = Runnable {
+                fieldView.rowSpacing = row.coerceAtLeast(0.1f)
+                fieldView.rowCount = count
+                fieldView.rowsHorizontal = directionSelector.selectedItemPosition == 1
+            }
+            previewTask = task
+            previewHandler.postDelayed(task, 350L)
             val maximum = kotlin.math.floor(across / row.coerceAtLeast(0.1f)).toInt().coerceAtLeast(1)
             rowStatus.text = if (count > maximum) "⚠️ $count rows exceed the estimated $maximum rows that fit at this spacing."
-                else "🌱 ${if (count > 0) count else maximum} rows in the top-down field preview"
+                else "🌱 ${if (count > 0) count else maximum} rows selected (large fields use a simplified preview)"
         }
         val rowWatcher = object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
