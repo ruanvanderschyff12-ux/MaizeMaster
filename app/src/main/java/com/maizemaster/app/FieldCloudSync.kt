@@ -35,10 +35,12 @@ class FieldCloudSync(private val context: Context) {
                     merged.add(remote)
                     recovered++
                 } else if (FieldStorage.toJson(merged[index]).toString() != FieldStorage.toJson(remote).toString()) {
-                    val copy = remote.copy(id = UUID.randomUUID().toString(), name = remote.name + " (cloud copy)")
-                    merged.add(copy)
-                    uploads.add(copy.id to mapOf("payload" to FieldStorage.toJson(copy).toString()))
-                    conflicts++
+                    val copy = remote.copy(id = UUID.nameUUIDFromBytes((remote.id + raw).toByteArray(Charsets.UTF_8)).toString(), name = remote.name + " (cloud copy)")
+                    if (merged.none { it.id == copy.id }) {
+                        merged.add(copy)
+                        uploads.add(copy.id to mapOf("payload" to FieldStorage.toJson(copy).toString()))
+                        conflicts++
+                    }
                 }
             }
             if (!local.saveFields(merged)) {
