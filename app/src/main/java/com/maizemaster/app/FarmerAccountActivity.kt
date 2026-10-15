@@ -87,17 +87,32 @@ class FarmerAccountActivity : Activity() {
             }
         })
         layout.addView(Button(this).apply {
+            text = "Sync fields now (safe merge)"
+            setOnClickListener {
+                if (auth.currentUser == null) {
+                    status.text = "Sign in first."
+                    return@setOnClickListener
+                }
+                isEnabled = false
+                status.text = "Syncing fields..."
+                FieldCloudSync(this@FarmerAccountActivity).sync { result ->
+                    isEnabled = true
+                    status.text = result
+                }
+            }
+        })
+        layout.addView(Button(this).apply {
             text = "Sign out"
             setOnClickListener {
                 AlertDialog.Builder(this@FarmerAccountActivity)
                     .setTitle("Sign out?")
-                    .setMessage("Your locally saved fields will stay on this phone. Cloud field syncing is not enabled yet.")
+                    .setMessage("Your locally saved fields will stay on this phone. Cloud syncing requires pressing Sync fields now.")
                     .setPositiveButton("Sign out") { _, _ -> auth.signOut(); refresh() }
                     .setNegativeButton("Cancel", null).show()
             }
         })
         layout.addView(TextView(this).apply {
-            text = "Signing in does not upload or sync fields yet. Keep your existing app data until cloud sync is tested."
+            text = "Cloud sync is manual for now. Use Sync fields now on each phone. Conflicts are kept as separate copies; no fields are intentionally deleted."
         })
         refresh()
     }
