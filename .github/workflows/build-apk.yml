@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: maizemaster-apk-signing
   cancel-in-progress: false
@@ -93,6 +96,24 @@ jobs:
             --title "MaizeMaster Build ${GITHUB_RUN_NUMBER}" \
             --notes "Signed Android APK for updating MaizeMaster without uninstalling. Download MaizeMaster.apk directly." \
             --latest
+
+
+      - name: Publish directly downloadable APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)
+          test -s "$APK"
+          cp "$APK" "$RUNNER_TEMP/MaizeMaster.apk"
+          TAG="apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
+          gh release create "$TAG" "$RUNNER_TEMP/MaizeMaster.apk#MaizeMaster.apk" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "MaizeMaster APK build ${{ github.run_number }}" \
+            --notes "Direct APK download for Android. Install over the existing MaizeMaster app to retain your data. This is a testing build." \
+            --prerelease
 
       - name: Upload MaizeMaster APK
         uses: actions/upload-artifact@v4
