@@ -56,7 +56,8 @@ class FieldStorage(context: Context) {
                             "growthObservedDate", ""
                         ),
                         rowCount = item.optInt("rowCount", 0),
-                        rowsHorizontal = item.optBoolean("rowsHorizontal", false)
+                        rowsHorizontal = item.optBoolean("rowsHorizontal", false),
+                        gpsHectares = item.optDouble("gpsHectares", 0.0)
                     )
                 )
             }
@@ -94,6 +95,7 @@ class FieldStorage(context: Context) {
                 put("growthObservedDate", field.growthObservedDate)
                 put("rowCount", field.rowCount)
                 put("rowsHorizontal", field.rowsHorizontal)
+                put("gpsHectares", field.gpsHectares)
             }
 
             array.put(item)
