@@ -6,9 +6,6 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 concurrency:
   group: maizemaster-apk-signing
   cancel-in-progress: false
@@ -78,25 +75,6 @@ jobs:
           test -n "$APK"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           "$APKSIGNER" verify --verbose "$APK"
-
-      - name: Publish direct APK download on GitHub Releases
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          APK=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)
-          test -s "$APK"
-          mkdir -p release
-          cp "$APK" release/MaizeMaster.apk
-          TAG="build-${GITHUB_RUN_NUMBER}"
-          gh release create "$TAG" release/MaizeMaster.apk \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "MaizeMaster Build ${GITHUB_RUN_NUMBER}" \
-            --notes "Signed Android APK for updating MaizeMaster without uninstalling. Download MaizeMaster.apk directly." \
-            --latest
-
 
       - name: Publish directly downloadable APK
         shell: bash
