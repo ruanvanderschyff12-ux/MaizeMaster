@@ -213,7 +213,7 @@ class DashboardActivity : Activity() {
         if (::summary.isInitialized) refresh()
         if (::accountStatus.isInitialized) {
             val user = FirebaseAuth.getInstance().currentUser
-            accountStatus.text = if (user == null) "Not signed in — sign in or register to prepare for cloud syncing." else "Signed in: ${user.email ?: "Farmer"} — cloud field sync coming next."
+            accountStatus.text = if (user == null) "Not signed in — sign in or register to prepare for cloud syncing." else "Signed in: ${user.email ?: "Farmer"} — tap Manage Farmer Account to sync fields."
         }
         WeatherAutoSync.refresh(this)
     }
