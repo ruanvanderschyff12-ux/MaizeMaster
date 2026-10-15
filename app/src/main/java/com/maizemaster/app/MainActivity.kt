@@ -325,6 +325,15 @@ class MainActivity : Activity() {
         }
 
         fieldCard.addView(fieldView)
+        val zoomControls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        listOf("− Zoom out", "Reset", "+ Zoom in").forEachIndexed { index, label ->
+            zoomControls.addView(button(label, true).apply {
+                layoutParams = LinearLayout.LayoutParams(0, dp(49), 1f)
+                setOnClickListener { when (index) { 0 -> fieldView.zoomOut(); 1 -> fieldView.resetZoom(); else -> fieldView.zoomIn() } }
+            })
+        }
+        fieldCard.addView(zoomControls)
+        fieldCard.addView(text("Pinch to zoom and drag to explore the maize rows.", 12f, muted))
         val editOutlineButton = button("✏️ Adjust GPS field outline", true)
         val saveOutlineButton = button("💾 Save adjusted outline")
         val cancelOutlineButton = button("Cancel outline changes", true)
@@ -408,8 +417,45 @@ class MainActivity : Activity() {
         val rowInput = input("Row spacing (metres)")
         val plantInput = input("Plant spacing (metres)")
 
-        plantingCard.addView(rowInput)
-        plantingCard.addView(plantInput)
+        fieldCard.addView(heading("🌽 Maize row layout"))
+        fieldCard.addView(rowInput)
+        fieldCard.addView(plantInput)
+        val rowCountInput = input("Exact number of rows (blank = automatic)").apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+        }
+        fieldCard.addView(rowCountInput)
+        val directionSelector = Spinner(this).apply {
+            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
+                arrayOf("Vertical rows", "Horizontal rows"))
+        }
+        fieldCard.addView(text("Planting direction", 13f, muted))
+        fieldCard.addView(directionSelector)
+        val rowStatus = text("", 13f, forest)
+        fieldCard.addView(rowStatus)
+        fun updateRowPreview() {
+            val row = rowInput.text.toString().toFloatOrNull() ?: 0.75f
+            val across = if (directionSelector.selectedItemPosition == 1)
+                (lengthInput.text.toString().toFloatOrNull() ?: 300f)
+                else (widthInput.text.toString().toFloatOrNull() ?: 200f)
+            val count = rowCountInput.text.toString().toIntOrNull() ?: 0
+            fieldView.rowSpacing = row.coerceAtLeast(0.1f)
+            fieldView.rowCount = count
+            fieldView.rowsHorizontal = directionSelector.selectedItemPosition == 1
+            val maximum = kotlin.math.floor(across / row.coerceAtLeast(0.1f)).toInt().coerceAtLeast(1)
+            rowStatus.text = if (count > maximum) "⚠️ $count rows exceed the estimated $maximum rows that fit at this spacing."
+                else "🌱 ${if (count > 0) count else maximum} rows in the top-down field preview"
+        }
+        val rowWatcher = object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updateRowPreview() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        }
+        listOf(rowInput, plantInput, rowCountInput, widthInput, lengthInput).forEach { it.addTextChangedListener(rowWatcher) }
+        directionSelector.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) { updateRowPreview() }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+        updateRowPreview()
 
         plantingCard.addView(
             text("Maize variety", 13f, muted)
@@ -534,6 +580,11 @@ class MainActivity : Activity() {
             // Defaults allow saving dimensions before visiting the Planting page.
             val row = rowInput.text.toString().trim().ifEmpty { "0.75" }.toDoubleOrNull()
             val plant = plantInput.text.toString().trim().ifEmpty { "0.25" }.toDoubleOrNull()
+            val explicitRows = rowCountInput.text.toString().toIntOrNull() ?: 0
+            if (explicitRows < 0 || explicitRows > 100000 || (rowCountInput.text.isNotBlank() && explicitRows == 0)) {
+                message("Enter a valid row count (1–100000).")
+                return null
+            }
             val yieldRate =
                 yieldInput.text.toString().trim().ifEmpty { "0" }.toDoubleOrNull()
 
@@ -574,7 +625,9 @@ class MainActivity : Activity() {
                 plantSpacing = plant,
                 maizeVariety =
                     maizeSelector.selectedItem.toString(),
-                expectedYield = yieldRate
+                expectedYield = yieldRate,
+                rowCount = rowCountInput.text.toString().toIntOrNull() ?: 0,
+                rowsHorizontal = directionSelector.selectedItemPosition == 1
             )
         }
 
@@ -593,6 +646,8 @@ class MainActivity : Activity() {
             fieldView.fieldWidth = field.width.toFloat()
             fieldView.fieldLength = field.length.toFloat()
             fieldView.rowSpacing = field.rowSpacing.toFloat()
+            fieldView.rowCount = field.rowCount
+            fieldView.rowsHorizontal = field.rowsHorizontal
             fieldView.fieldShape = field.shape
             fieldView.gpsBoundary = try {
                 JSONArray(getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE)
@@ -620,6 +675,8 @@ class MainActivity : Activity() {
             lengthInput.setText(field.length.toString())
             rowInput.setText(field.rowSpacing.toString())
             plantInput.setText(field.plantSpacing.toString())
+            rowCountInput.setText(if (field.rowCount > 0) field.rowCount.toString() else "")
+            directionSelector.setSelection(if (field.rowsHorizontal) 1 else 0)
             yieldInput.setText(field.expectedYield.toString())
 
             shapeSelector.setSelection(
@@ -1378,6 +1435,8 @@ class MainActivity : Activity() {
             lengthInput.setText("")
             rowInput.setText("")
             plantInput.setText("")
+            rowCountInput.setText("")
+            directionSelector.setSelection(0)
             yieldInput.setText("")
 
             shapeSelector.setSelection(0)
