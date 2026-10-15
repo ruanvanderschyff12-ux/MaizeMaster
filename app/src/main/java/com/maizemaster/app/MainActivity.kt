@@ -303,6 +303,13 @@ class MainActivity : Activity() {
             else pageSelector.setSelection(index)
         }
         homePage.addView(card().apply {
+            addView(heading("📍 GPS Field Measurement"))
+            addView(text("Walk or drive around a field to calculate hectares without entering dimensions.", 14f, muted))
+            addView(button("Measure new field with GPS").apply {
+                setOnClickListener { startActivity(Intent(this@MainActivity, FieldBoundaryActivity::class.java)) }
+            })
+        })
+        homePage.addView(card().apply {
             addView(heading("Manage your maize farm"))
             addView(text("Choose a section below to work on it without the other forms in the way.", 14f, muted))
             listOf("🌱 Field Designer" to 1, "🚜 Planting Details" to 2,
