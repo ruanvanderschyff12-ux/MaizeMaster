@@ -9,6 +9,7 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.widget.*
 import org.json.JSONArray
+import kotlin.math.*
 
 class FieldBoundaryActivity : Activity(), LocationListener {
     private val prefs by lazy { getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE) }
@@ -77,7 +78,25 @@ class FieldBoundaryActivity : Activity(), LocationListener {
             if (previous.distanceTo(location) < 4f) return
         }
         points.put(JSONArray().put(location.latitude).put(location.longitude))
-        status.text = "Recording boundary... ${points.length()} GPS points"
+        status.text = "Recording ${points.length()} GPS points | Approx. %.2f ha".format(calculateAreaHectares())
+    }
+
+    private fun calculateAreaHectares(): Double {
+        if (points.length() < 3) return 0.0
+        val lat0 = (0 until points.length()).map { points.getJSONArray(it).getDouble(0) }.average()
+        val lon0 = (0 until points.length()).map { points.getJSONArray(it).getDouble(1) }.average()
+        val factor = 111320.0 * cos(Math.toRadians(lat0))
+        var twiceArea = 0.0
+        for (i in 0 until points.length()) {
+            val a = points.getJSONArray(i)
+            val b = points.getJSONArray((i + 1) % points.length())
+            val ax = (a.getDouble(1) - lon0) * factor
+            val ay = (a.getDouble(0) - lat0) * 111320.0
+            val bx = (b.getDouble(1) - lon0) * factor
+            val by = (b.getDouble(0) - lat0) * 111320.0
+            twiceArea += ax * by - bx * ay
+        }
+        return abs(twiceArea) / 20000.0
     }
 
     private fun saveBoundary() {
@@ -85,9 +104,14 @@ class FieldBoundaryActivity : Activity(), LocationListener {
             status.text = "At least 3 accurate GPS points are needed. Continue around the field."
             return
         }
-        if (prefs.edit().putString("${fieldId}_boundary", points.toString()).commit()) {
+        val hectares = calculateAreaHectares()
+        if (!hectares.isFinite() || hectares < 0.001) {
+            status.text = "GPS boundary too small or inaccurate. Continue around the field."
+            return
+        }
+        if (prefs.edit().putString("${fieldId}_boundary", points.toString()).putFloat("${fieldId}_hectares", hectares.toFloat()).commit()) {
             stopRecording()
-            Toast.makeText(this, "Field GPS boundary saved", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "GPS boundary saved: %.2f hectares".format(hectares), Toast.LENGTH_LONG).show()
             finish()
         } else status.text = "Unable to save boundary. Try again."
     }
