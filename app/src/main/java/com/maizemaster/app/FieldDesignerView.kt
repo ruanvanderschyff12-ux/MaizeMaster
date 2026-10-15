@@ -71,6 +71,8 @@ class FieldDesignerView(context: Context) : View(context) {
     }
     private var cachedBitmap: Bitmap? = null
     private var needsRedraw = true
+    // Limit preview rendering work; the saved row count remains exact.
+    private val maxPreviewRows = 420
 
     var gpsBoundary = JSONArray()
         set(value) { field = value; refreshField() }
@@ -351,13 +353,15 @@ class FieldDesignerView(context: Context) : View(context) {
         val actualRows = if (rowCount > 0) rowCount else
             ceil(acrossMetres / rowSpacing).toInt().coerceAtLeast(1)
         val safeRows = actualRows.coerceIn(1, 100000)
+        val previewRows = min(safeRows, maxPreviewRows)
         val acrossPixels = if (rowsHorizontal) cropHeight else cropWidth
         val alongPixels = if (rowsHorizontal) cropWidth else cropHeight
         val rowGap = acrossPixels / safeRows
         val plantCount = (alongPixels / 13f).toInt().coerceIn(2, 35)
         val plantGap = alongPixels / plantCount
-        for (i in 0 until safeRows) {
-            val cross = (i + 0.5f) * rowGap
+        for (i in 0 until previewRows) {
+            val rowIndex = ((i + 0.5f) * safeRows / previewRows).toInt().coerceIn(0, safeRows - 1)
+            val cross = (rowIndex + 0.5f) * rowGap
             val x1 = if (rowsHorizontal) cropLeft else cropLeft + cross
             val y1 = if (rowsHorizontal) cropTop + cross else cropTop
             val x2 = if (rowsHorizontal) cropLeft + cropWidth else x1
@@ -367,7 +371,7 @@ class FieldDesignerView(context: Context) : View(context) {
             paint.strokeWidth = max(0.25f, min(3f, rowGap * 0.18f))
             canvas.drawLine(x1, y1, x2, y2, paint)
             // Individual maize leaves appear when zooming in.
-            if (rowGap * zoom >= 2f && growthDays >= 7) {
+            if (safeRows <= maxPreviewRows && rowGap * zoom >= 2f && growthDays >= 7) {
                 for (j in 0 until plantCount) {
                     val along = (j + 0.5f) * plantGap
                     val x = if (rowsHorizontal) cropLeft + along else x1
@@ -379,7 +383,7 @@ class FieldDesignerView(context: Context) : View(context) {
             } else {
                 paint.style = Paint.Style.STROKE
                 paint.color = Color.rgb(35, 123, 43)
-                paint.strokeWidth = max(0.25f, min(rowGap * 0.8f, 3f))
+                paint.strokeWidth = max(0.6f, min(acrossPixels / previewRows * 0.75f, 3f))
                 canvas.drawLine(x1, y1, x2, y2, paint)
             }
         }
