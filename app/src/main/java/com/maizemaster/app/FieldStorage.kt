@@ -95,9 +95,11 @@ class FieldStorage(context: Context) {
             array.put(item)
         }
 
-        return preferences.edit()
+        val saved = preferences.edit()
             .putString("saved_fields", array.toString())
             .commit()
+        if (saved) FieldCloudBackup.syncAfterLocalSave(preferences, fields)
+        return saved
     }
 
     fun addField(field: SavedField): Boolean {
