@@ -18,9 +18,11 @@ data class SavedField(
     var growthNotes: String = "",
     var growthObservedDate: String = "",
     var rowCount: Int = 0,
-    var rowsHorizontal: Boolean = false
+    var rowsHorizontal: Boolean = false,
+    var gpsHectares: Double = 0.0
 ) {
     fun hectares(): Double {
+        if (gpsHectares > 0.0 && gpsHectares.isFinite()) return gpsHectares
         return HarvestCalculator.calculateHectares(
             width,
             length,
