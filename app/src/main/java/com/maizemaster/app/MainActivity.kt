@@ -193,11 +193,15 @@ class MainActivity : Activity() {
     }
 
     private var cloudSyncRunning = false
+    private var cloudSyncQueued = false
     private var lastCloudSyncAttempt = 0L
 
     private fun syncFieldsInBackground(force: Boolean = false) {
         if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) return
-        if (cloudSyncRunning) return
+        if (cloudSyncRunning) {
+            if (force) cloudSyncQueued = true
+            return
+        }
         val now = System.currentTimeMillis()
         if (!force && now - lastCloudSyncAttempt < 30000L) return
         lastCloudSyncAttempt = now
@@ -205,6 +209,10 @@ class MainActivity : Activity() {
         FieldCloudSync(this).sync {
             cloudSyncRunning = false
             if (::refreshList.isInitialized) refreshList()
+            if (cloudSyncQueued) {
+                cloudSyncQueued = false
+                syncFieldsInBackground(force = true)
+            }
         }
     }
 
