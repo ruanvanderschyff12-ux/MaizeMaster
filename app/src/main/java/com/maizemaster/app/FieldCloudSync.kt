@@ -17,10 +17,18 @@ class FieldCloudSync(private val context: Context) {
     private val local = FieldStorage(context)
     private val baselines = context.getSharedPreferences("maizemaster_sync_baselines", Context.MODE_PRIVATE)
 
+    private val syncState = context.getSharedPreferences("maizemaster_sync_state", Context.MODE_PRIVATE)
+    private fun finish(message: String, done: (String) -> Unit) {
+        syncState.edit().putString("status", message)
+            .putLong("updated_at", System.currentTimeMillis()).apply()
+        done(message)
+    }
+
     fun sync(done: (String) -> Unit) {
+        syncState.edit().putString("status", "Syncing fields...").apply()
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         if (uid == null) {
-            done("Sign in before syncing.")
+            finish("Sign in before syncing.", done)
             return
         }
         val collection = db.collection("farmers").document(uid).collection("fields")
@@ -81,7 +89,7 @@ class FieldCloudSync(private val context: Context) {
                 }
             }
             if (!local.saveFields(merged)) {
-                done("Could not save local fields. Cloud was not changed.")
+                finish("Could not save local fields. Cloud was not changed.", done)
                 return@addOnSuccessListener
             }
             fun recordBaselines() {
@@ -98,11 +106,11 @@ class FieldCloudSync(private val context: Context) {
             }
             if (uploads.isEmpty()) {
                 recordBaselines()
-                done("Sync complete. Restored $recovered field(s); preserved $conflicts conflict copy/copies.")
+                finish("Sync complete. Restored $recovered field(s); preserved $conflicts conflict copy/copies.", done)
                 return@addOnSuccessListener
             }
             if (uploads.size > 450) {
-                done("Local fields saved, but too many cloud updates for one batch. No cloud changes made.")
+                finish("Local fields saved, but too many cloud updates for one batch. No cloud changes made.", done)
                 return@addOnSuccessListener
             }
             val batch = db.batch()
@@ -111,12 +119,12 @@ class FieldCloudSync(private val context: Context) {
             }
             batch.commit().addOnSuccessListener {
                 recordBaselines()
-                done("Sync complete. Restored $recovered, preserved $conflicts conflict copy/copies, uploaded ${uploads.size}.")
+                finish("Sync complete. Restored $recovered, preserved $conflicts conflict copy/copies, uploaded ${uploads.size}.", done)
             }.addOnFailureListener {
-                done("Local fields preserved; cloud upload failed: ${it.localizedMessage}")
+                finish("Local fields preserved; cloud upload failed: ${it.localizedMessage}", done)
             }
         }.addOnFailureListener {
-            done("Sync unavailable: ${it.localizedMessage}. Local fields remain unchanged.")
+            finish("Sync unavailable: ${it.localizedMessage}. Local fields remain unchanged.", done)
         }
     }
 }
