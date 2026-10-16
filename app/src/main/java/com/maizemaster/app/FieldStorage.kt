@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-class FieldStorage(context: Context) {
+class FieldStorage(private val context: Context) {
 
     private val preferences = context.getSharedPreferences(
         "maizemaster_fields",
