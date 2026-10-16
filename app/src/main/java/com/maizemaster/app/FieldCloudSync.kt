@@ -44,10 +44,12 @@ class FieldCloudSync(private val context: Context) {
             val deletedIds = local.pendingDeletedIds()
             val merged = local.loadFields().filterNot { it.id in deletedIds }.toMutableList()
             val remoteById = mutableMapOf<String, SavedField>()
+            val cloudDeleted = snapshot.documents.filter { it.getBoolean("deleted") == true }.map { it.id }.toSet()
+            merged.removeAll { it.id in cloudDeleted }
             for (doc in snapshot.documents) {
                 val raw = doc.getString("payload") ?: continue
                 val remote = try { FieldStorage.fromJson(JSONObject(raw)) } catch (_: Exception) { null } ?: continue
-                if (remote.id == doc.id && doc.id !in deletedIds) remoteById[doc.id] = remote
+                if (remote.id == doc.id && doc.id !in deletedIds && doc.id !in cloudDeleted) remoteById[doc.id] = remote
             }
 
             val uploads = linkedMapOf<String, SavedField>()
@@ -91,7 +93,7 @@ class FieldCloudSync(private val context: Context) {
                 }
             }
             for (field in merged) {
-                if (!remoteById.containsKey(field.id) && !uploads.containsKey(field.id)) {
+                if (!remoteById.containsKey(field.id) && !uploads.containsKey(field.id) && field.id !in cloudDeleted) {
                     uploads[field.id] = field
                 }
             }
@@ -153,7 +155,7 @@ class FieldCloudSync(private val context: Context) {
                             tx.set(collection.document(copy.id), mapOf("payload" to FieldStorage.toJson(copy).toString()))
                         }
                     }
-                    tx.delete(collection.document(id))
+                    tx.set(collection.document(id), mapOf("deleted" to true, "payload" to (payload ?: "")))
                 }
                 raced
             }.addOnSuccessListener { raced ->
