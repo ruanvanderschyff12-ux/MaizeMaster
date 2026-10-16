@@ -4,7 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-class FieldStorage(context: Context) {
+class FieldStorage(private val context: Context) {
 
     private val preferences = context.getSharedPreferences(
         "maizemaster_fields",
@@ -124,13 +124,27 @@ class FieldStorage(context: Context) {
         return saveFields(fields)
     }
 
+    private val deletionPrefs = context.getSharedPreferences("maizemaster_pending_deletions", Context.MODE_PRIVATE)
+
+    fun pendingDeletedIds(): Set<String> =
+        deletionPrefs.getStringSet("ids", emptySet())?.toSet() ?: emptySet()
+
+    fun clearPendingDeletion(fieldId: String) {
+        val next = pendingDeletedIds().toMutableSet()
+        next.remove(fieldId)
+        deletionPrefs.edit().putStringSet("ids", next).commit()
+    }
+
     fun deleteField(fieldId: String): Boolean {
         val fields = loadFields()
         val removed = fields.removeAll {
             it.id == fieldId
         }
 
-        return removed && saveFields(fields)
+        if (!removed || !saveFields(fields)) return false
+        val next = pendingDeletedIds().toMutableSet()
+        next.add(fieldId)
+        return deletionPrefs.edit().putStringSet("ids", next).commit()
     }
     companion object {
         fun fromJson(item: JSONObject): SavedField = SavedField(

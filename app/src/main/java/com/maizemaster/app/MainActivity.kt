@@ -1347,6 +1347,7 @@ class MainActivity : Activity() {
                                                 "Creating a new field"
                                         }
                                         refreshList()
+                                        syncFieldsInBackground(force = true)
                                     } else {
                                         message(
                                             "Could not delete field."

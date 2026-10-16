@@ -28,7 +28,16 @@ class FarmerAccountActivity : Activity() {
         layout.addView(syncStatus)
         fun showSyncStatus() {
             val state = getSharedPreferences("maizemaster_sync_state", MODE_PRIVATE)
-            syncStatus.text = "Cloud sync: " + (state.getString("status", null) ?: "Not checked yet")
+            val detail = state.getString("status", null) ?: "Not checked yet"
+            val pending = FieldStorage(this).pendingDeletedIds().size
+            val label = when {
+                auth.currentUser == null -> "Not signed in"
+                detail.startsWith("Syncing") -> "🔄 Syncing"
+                detail.startsWith("Sync complete") -> "✅ Synced (last attempt)"
+                detail.startsWith("Sync unavailable") || detail.contains("failed", true) -> "⚠️ Sync needs attention"
+                else -> "☁️ Sync status"
+            }
+            syncStatus.text = "$label\n$detail" + if (pending > 0) "\n⏳ $pending field deletion(s) waiting to sync" else ""
         }
         showSyncStatus()
         val email = EditText(this).apply {
@@ -120,7 +129,7 @@ class FarmerAccountActivity : Activity() {
             }
         })
         layout.addView(TextView(this).apply {
-            text = "Field sync runs when the dashboard opens and after supported field saves. Use manual sync to retry. Offline edits remain saved locally; reopen the dashboard after internet returns. Conflicting edits are preserved as separate copies; deletions are not yet synced."
+            text = "Field sync runs when the dashboard opens and after supported field saves. Use manual sync to retry. Offline edits remain saved locally; reopen the dashboard after internet returns. Conflicting edits are preserved as separate copies. Field deletions are queued for cloud sync; use a temporary test field until verified."
         })
         refresh()
     }
