@@ -41,12 +41,13 @@ class FieldCloudSync(private val context: Context) {
         }
         val collection = db.collection("farmers").document(uid).collection("fields")
         collection.get().addOnSuccessListener { snapshot ->
-            val merged = local.loadFields()
+            val deletedIds = local.pendingDeletedIds()
+            val merged = local.loadFields().filterNot { it.id in deletedIds }.toMutableList()
             val remoteById = mutableMapOf<String, SavedField>()
             for (doc in snapshot.documents) {
                 val raw = doc.getString("payload") ?: continue
                 val remote = try { FieldStorage.fromJson(JSONObject(raw)) } catch (_: Exception) { null } ?: continue
-                if (remote.id == doc.id) remoteById[doc.id] = remote
+                if (remote.id == doc.id && doc.id !in deletedIds) remoteById[doc.id] = remote
             }
 
             val uploads = linkedMapOf<String, SavedField>()
@@ -110,12 +111,12 @@ class FieldCloudSync(private val context: Context) {
                 }
                 editor.apply()
             }
-            if (uploads.isEmpty()) {
+            if (uploads.isEmpty() && deletedIds.isEmpty()) {
                 recordBaselines()
                 finish("Sync complete. Restored $recovered field(s); preserved $conflicts conflict copy/copies.", done)
                 return@addOnSuccessListener
             }
-            if (uploads.size > 450) {
+            if (uploads.size + deletedIds.size > 450) {
                 finish("Local fields saved, but too many cloud updates for one batch. No cloud changes made.", done)
                 return@addOnSuccessListener
             }
@@ -126,6 +127,7 @@ class FieldCloudSync(private val context: Context) {
                 val currentDocs = ordered.map { (id, _) ->
                     tx.get(collection.document(id))
                 }
+                val deletionDocs = deletedIds.map { id -> id to tx.get(collection.document(id)) }
                 var raced = 0
                 for (index in ordered.indices) {
                     val (id, field) = ordered[index]
@@ -141,9 +143,22 @@ class FieldCloudSync(private val context: Context) {
                         raced++
                     }
                 }
+                for ((id, doc) in deletionDocs) {
+                    val baseline = baselines.getString("$uid:$id", null)
+                    val payload = doc.getString("payload")
+                    if (payload != null && baseline != null && payload != baseline) {
+                        val changed = try { FieldStorage.fromJson(JSONObject(payload)) } catch (_: Exception) { null }
+                        if (changed != null) {
+                            val copy = copyOf(changed, uid)
+                            tx.set(collection.document(copy.id), mapOf("payload" to FieldStorage.toJson(copy).toString()))
+                        }
+                    }
+                    tx.delete(collection.document(id))
+                }
                 raced
             }.addOnSuccessListener { raced ->
                 if (raced == 0) recordBaselines()
+                for (id in deletedIds) local.clearPendingDeletion(id)
                 finish("Sync complete. Preserved $conflicts conflict copies; $raced concurrent edit(s) saved as copies. Reopen to refresh.", done)
             }.addOnFailureListener {
                 finish("Local fields preserved; cloud upload failed: ${it.localizedMessage}", done)
