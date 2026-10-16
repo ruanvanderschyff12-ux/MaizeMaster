@@ -149,10 +149,10 @@ class FarmerAccountActivity : Activity() {
                 val originalName = copy.name.removeSuffix(" (conflict copy)")
                 val candidates = fields.filter { it.id != copy.id && it.name == originalName }
                 reviewContainer.addView(TextView(this).apply {
-                    text = "Review: $originalName\\nConflict version: ${copy.name}\\nArea: ${copy.width} × ${copy.length} m; yield: ${copy.expectedYield} t/ha" +
-                        if (candidates.size == 1) "\\nOriginal: ${candidates[0].name}; area: ${candidates[0].width} × ${candidates[0].length} m; yield: ${candidates[0].expectedYield} t/ha" else "\\nOriginal not uniquely identified — both fields will be kept."
+                    text = "Review: $originalName\nConflict version: ${copy.name}\nArea: ${copy.width} × ${copy.length} m; yield: ${copy.expectedYield} t/ha" +
+                        if (candidates.size == 1) "\nOriginal: ${candidates[0].name}; area: ${candidates[0].width} × ${candidates[0].length} m; yield: ${candidates[0].expectedYield} t/ha" else "\nOriginal not uniquely identified — both fields will be kept."
                 })
-                layout.addView(TextView(this).apply { text = "" })
+
                 reviewContainer.addView(Button(this).apply {
                     text = "Keep conflict version as separate field"
                     setOnClickListener {
@@ -181,24 +181,7 @@ class FarmerAccountActivity : Activity() {
                             .setNegativeButton("Cancel", null).show()
                     }
                 })
-                if (candidates.size == 1) {
-                    val original = candidates[0]
-                    reviewContainer.addView(Button(this).apply {
-                        text = "Replace original with conflict version"
-                        setOnClickListener {
-                            AlertDialog.Builder(this@FarmerAccountActivity)
-                                .setTitle("Replace original?")
-                                .setMessage("Use this conflict version for $originalName and discard the conflict copy? This will sync to other devices.")
-                                .setPositiveButton("Replace") { _, _ ->
-                                    storage.updateField(copy.copy(id = original.id, name = originalName))
-                                    storage.deleteField(copy.id)
-                                    showConflictReview()
-                                    FieldCloudSync(this@FarmerAccountActivity).sync { showSyncStatus() }
-                                }
-                                .setNegativeButton("Cancel", null).show()
-                        }
-                    })
-                }
+
             }
         }
         showConflictReview()
