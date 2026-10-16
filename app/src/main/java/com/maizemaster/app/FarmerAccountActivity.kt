@@ -128,6 +128,80 @@ class FarmerAccountActivity : Activity() {
                     .setNegativeButton("Cancel", null).show()
             }
         })
+        // Review retained copies only after sync. No automatic deletion.
+        layout.addView(TextView(this).apply {
+            text = "🌽 Conflict review"
+            textSize = 22f
+        })
+        val reviewContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        layout.addView(reviewContainer)
+        fun showConflictReview() {
+            reviewContainer.removeAllViews()
+            val storage = FieldStorage(this)
+            val fields = storage.loadFields()
+            val copies = fields.filter { it.name.endsWith(" (conflict copy)") }
+            if (copies.isEmpty()) {
+                reviewContainer.addView(TextView(this).apply { text = "No conflict copies to review." })
+            }
+            for (copy in copies) {
+                val originalName = copy.name.removeSuffix(" (conflict copy)")
+                val candidates = fields.filter { it.id != copy.id && it.name == originalName }
+                reviewContainer.addView(TextView(this).apply {
+                    text = "Review: $originalName\\nConflict version: ${copy.name}\\nArea: ${copy.width} × ${copy.length} m; yield: ${copy.expectedYield} t/ha" +
+                        if (candidates.size == 1) "\\nOriginal: ${candidates[0].name}; area: ${candidates[0].width} × ${candidates[0].length} m; yield: ${candidates[0].expectedYield} t/ha" else "\\nOriginal not uniquely identified — both fields will be kept."
+                })
+                layout.addView(TextView(this).apply { text = "" })
+                reviewContainer.addView(Button(this).apply {
+                    text = "Keep conflict version as separate field"
+                    setOnClickListener {
+                        AlertDialog.Builder(this@FarmerAccountActivity)
+                            .setTitle("Keep both fields?")
+                            .setMessage("Rename the conflict copy to a normal separate field. The original remains unchanged.")
+                            .setPositiveButton("Keep both") { _, _ ->
+                                storage.updateField(copy.copy(name = "$originalName (saved alternative)"))
+                                showConflictReview()
+                                FieldCloudSync(this@FarmerAccountActivity).sync { showSyncStatus() }
+                            }
+                            .setNegativeButton("Cancel", null).show()
+                    }
+                })
+                reviewContainer.addView(Button(this).apply {
+                    text = "Discard conflict copy"
+                    setOnClickListener {
+                        AlertDialog.Builder(this@FarmerAccountActivity)
+                            .setTitle("Discard this version?")
+                            .setMessage("Delete only ${copy.name}? This also syncs the deletion to your other devices.")
+                            .setPositiveButton("Delete copy") { _, _ ->
+                                storage.deleteField(copy.id)
+                                showConflictReview()
+                                FieldCloudSync(this@FarmerAccountActivity).sync { showSyncStatus() }
+                            }
+                            .setNegativeButton("Cancel", null).show()
+                    }
+                })
+                if (candidates.size == 1) {
+                    val original = candidates[0]
+                    reviewContainer.addView(Button(this).apply {
+                        text = "Replace original with conflict version"
+                        setOnClickListener {
+                            AlertDialog.Builder(this@FarmerAccountActivity)
+                                .setTitle("Replace original?")
+                                .setMessage("Use this conflict version for $originalName and discard the conflict copy? This will sync to other devices.")
+                                .setPositiveButton("Replace") { _, _ ->
+                                    storage.updateField(copy.copy(id = original.id, name = originalName))
+                                    storage.deleteField(copy.id)
+                                    showConflictReview()
+                                    FieldCloudSync(this@FarmerAccountActivity).sync { showSyncStatus() }
+                                }
+                                .setNegativeButton("Cancel", null).show()
+                        }
+                    })
+                }
+            }
+        }
+        showConflictReview()
         layout.addView(TextView(this).apply {
             text = "Field sync runs when the dashboard opens and after supported field saves. Use manual sync to retry. Offline edits remain saved locally; reopen the dashboard after internet returns. Conflicting edits are preserved as separate copies. Field deletions are queued for cloud sync; use a temporary test field until verified."
         })
