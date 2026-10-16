@@ -192,9 +192,34 @@ class MainActivity : Activity() {
         ).show()
     }
 
+    private var cloudSyncRunning = false
+    private var cloudSyncQueued = false
+    private var lastCloudSyncAttempt = 0L
+
+    private fun syncFieldsInBackground(force: Boolean = false) {
+        if (com.google.firebase.auth.FirebaseAuth.getInstance().currentUser == null) return
+        if (cloudSyncRunning) {
+            if (force) cloudSyncQueued = true
+            return
+        }
+        val now = System.currentTimeMillis()
+        if (!force && now - lastCloudSyncAttempt < 30000L) return
+        lastCloudSyncAttempt = now
+        cloudSyncRunning = true
+        FieldCloudSync(this).sync {
+            cloudSyncRunning = false
+            if (::refreshList.isInitialized) refreshList()
+            if (cloudSyncQueued) {
+                cloudSyncQueued = false
+                syncFieldsInBackground(force = true)
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         if (::refreshList.isInitialized) refreshList()
+        syncFieldsInBackground()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -773,6 +798,7 @@ class MainActivity : Activity() {
                         field.harvestedTons = tons
 
                         if (storage.updateField(field)) {
+                            syncFieldsInBackground(force = true)
                             dialog.dismiss()
                             refreshList()
                         } else {
@@ -937,6 +963,7 @@ class MainActivity : Activity() {
                             )
 
                         if (storage.updateField(field)) {
+                            syncFieldsInBackground(force = true)
                             dialog.dismiss()
                             refreshList()
                             message(
@@ -1360,6 +1387,7 @@ class MainActivity : Activity() {
 
             if (field != null) {
                 if (storage.addField(field)) {
+                    syncFieldsInBackground(force = true)
                     editingId = field.id
                     editingLabel.text =
                         "Editing: ${field.name}"
@@ -1423,6 +1451,7 @@ class MainActivity : Activity() {
                     } else if (
                         storage.updateField(updated)
                     ) {
+                        syncFieldsInBackground(force = true)
                         showCalculation(updated)
                         refreshList()
                         message(
