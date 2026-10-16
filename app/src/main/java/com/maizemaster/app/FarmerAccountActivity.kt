@@ -24,6 +24,13 @@ class FarmerAccountActivity : Activity() {
         status = TextView(this).apply { textSize = 17f }
         layout.addView(TextView(this).apply { text = "🌽 Farmer Account"; textSize = 26f })
         layout.addView(status)
+        val syncStatus = TextView(this).apply { textSize = 15f }
+        layout.addView(syncStatus)
+        fun showSyncStatus() {
+            val state = getSharedPreferences("maizemaster_sync_state", MODE_PRIVATE)
+            syncStatus.text = "Cloud sync: " + (state.getString("status", null) ?: "Not checked yet")
+        }
+        showSyncStatus()
         val email = EditText(this).apply {
             hint = "Email address"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
@@ -98,6 +105,7 @@ class FarmerAccountActivity : Activity() {
                 FieldCloudSync(this@FarmerAccountActivity).sync { result ->
                     isEnabled = true
                     status.text = result
+                    showSyncStatus()
                 }
             }
         })
@@ -106,13 +114,13 @@ class FarmerAccountActivity : Activity() {
             setOnClickListener {
                 AlertDialog.Builder(this@FarmerAccountActivity)
                     .setTitle("Sign out?")
-                    .setMessage("Your locally saved fields will stay on this phone. Cloud syncing requires pressing Sync fields now.")
+                    .setMessage("Your locally saved fields will stay on this phone. Cloud syncing requires signing in.")
                     .setPositiveButton("Sign out") { _, _ -> auth.signOut(); refresh() }
                     .setNegativeButton("Cancel", null).show()
             }
         })
         layout.addView(TextView(this).apply {
-            text = "Cloud sync is manual for now. Use Sync fields now on each phone. Conflicts are kept as separate copies; no fields are intentionally deleted."
+            text = "Field sync runs when the dashboard opens and after supported field saves. Use manual sync to retry. Offline edits remain saved locally; reopen the dashboard after internet returns. Conflicting edits are preserved as separate copies; deletions are not yet synced."
         })
         refresh()
     }
