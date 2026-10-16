@@ -45,7 +45,17 @@ class FieldCloudSync(private val context: Context) {
             val merged = local.loadFields().filterNot { it.id in deletedIds }.toMutableList()
             val remoteById = mutableMapOf<String, SavedField>()
             val cloudDeleted = snapshot.documents.filter { it.getBoolean("deleted") == true }.map { it.id }.toSet()
+            // Preserve unsynced local edits before applying a cloud deletion.
+            val preserved = mutableListOf<SavedField>()
+            for (field in merged.filter { it.id in cloudDeleted }) {
+                val baseline = baselines.getString("$uid:${field.id}", null)
+                val localJson = FieldStorage.toJson(field).toString()
+                if (baseline != null && baseline != localJson) {
+                    preserved.add(copyOf(field, uid))
+                }
+            }
             merged.removeAll { it.id in cloudDeleted }
+            merged.addAll(preserved.filter { copy -> merged.none { it.id == copy.id } })
             for (doc in snapshot.documents) {
                 val raw = doc.getString("payload") ?: continue
                 val remote = try { FieldStorage.fromJson(JSONObject(raw)) } catch (_: Exception) { null } ?: continue
@@ -135,7 +145,12 @@ class FieldCloudSync(private val context: Context) {
                     val (id, field) = ordered[index]
                     val actual = currentDocs[index].getString("payload")
                     val expected = remoteById[id]?.let { FieldStorage.toJson(it).toString() }
-                    if (actual == expected) {
+                    if (currentDocs[index].getBoolean("deleted") == true) {
+                        // A concurrent deletion wins; never revive its original ID.
+                        val copy = copyOf(field, uid)
+                        tx.set(collection.document(copy.id), mapOf("payload" to FieldStorage.toJson(copy).toString()))
+                        raced++
+                    } else if (actual == expected) {
                         tx.set(collection.document(id), mapOf("payload" to FieldStorage.toJson(field).toString()))
                     } else {
                         // Do not overwrite a concurrent cloud edit.
