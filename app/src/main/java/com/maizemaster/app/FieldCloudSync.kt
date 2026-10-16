@@ -17,6 +17,14 @@ class FieldCloudSync(private val context: Context) {
     private val local = FieldStorage(context)
     private val baselines = context.getSharedPreferences("maizemaster_sync_baselines", Context.MODE_PRIVATE)
 
+    private fun copyOf(field: SavedField, uid: String): SavedField {
+        val raw = FieldStorage.toJson(field).toString()
+        val copyId = UUID.nameUUIDFromBytes(
+            (uid + ":" + field.id + ":" + raw).toByteArray(Charsets.UTF_8)
+        ).toString()
+        return field.copy(id = copyId, name = field.name + " (conflict copy)")
+    }
+
     private val syncState = context.getSharedPreferences("maizemaster_sync_state", Context.MODE_PRIVATE)
     private fun finish(message: String, done: (String) -> Unit) {
         syncState.edit().putString("status", message)
@@ -68,18 +76,16 @@ class FieldCloudSync(private val context: Context) {
                         uploads[id] = current
                     }
                     else -> {
-                        // Both changed, or this phone has no verified baseline.
-                        // Keep the local original; preserve remote edits as a stable copy.
-                        val copyId = UUID.nameUUIDFromBytes(
-                            (uid + ":" + id + ":" + remoteJson).toByteArray(Charsets.UTF_8)
-                        ).toString()
-                        if (merged.none { it.id == copyId } && !remoteById.containsKey(copyId)) {
-                            val copy = remote.copy(id = copyId, name = remote.name + " (cloud copy)")
+                        // Preserve the local edit under a new stable ID.
+                        // Keep the remote version at the original ID.
+                        val copy = copyOf(current, uid)
+                        if (merged.none { it.id == copy.id } && !remoteById.containsKey(copy.id)) {
                             merged.add(copy)
-                            uploads[copyId] = copy
+                            uploads[copy.id] = copy
                             conflicts++
                         }
-                        // The original cloud record stays unchanged for now.
+                        merged[merged.indexOfFirst { it.id == id }] = remote
+                        recovered++
                     }
                 }
             }
@@ -113,13 +119,32 @@ class FieldCloudSync(private val context: Context) {
                 finish("Local fields saved, but too many cloud updates for one batch. No cloud changes made.", done)
                 return@addOnSuccessListener
             }
-            val batch = db.batch()
-            for ((id, field) in uploads) {
-                batch.set(collection.document(id), mapOf("payload" to FieldStorage.toJson(field).toString()))
-            }
-            batch.commit().addOnSuccessListener {
-                recordBaselines()
-                finish("Sync complete. Restored $recovered, preserved $conflicts conflict copy/copies, uploaded ${uploads.size}.", done)
+            // Compare cloud values inside a Firestore transaction before any write.
+            // A second phone can upload between our initial read and commit.
+            val ordered = uploads.toList()
+            db.runTransaction { tx ->
+                val currentDocs = ordered.map { (id, _) ->
+                    tx.get(collection.document(id))
+                }
+                var raced = 0
+                for (index in ordered.indices) {
+                    val (id, field) = ordered[index]
+                    val actual = currentDocs[index].getString("payload")
+                    val expected = remoteById[id]?.let { FieldStorage.toJson(it).toString() }
+                    if (actual == expected) {
+                        tx.set(collection.document(id), mapOf("payload" to FieldStorage.toJson(field).toString()))
+                    } else {
+                        // Do not overwrite a concurrent cloud edit.
+                        // Store our local edit as a distinct immutable snapshot.
+                        val copy = copyOf(field, uid)
+                        tx.set(collection.document(copy.id), mapOf("payload" to FieldStorage.toJson(copy).toString()))
+                        raced++
+                    }
+                }
+                raced
+            }.addOnSuccessListener { raced ->
+                if (raced == 0) recordBaselines()
+                finish("Sync complete. Preserved $conflicts conflict copies; $raced concurrent edit(s) saved as copies. Reopen to refresh.", done)
             }.addOnFailureListener {
                 finish("Local fields preserved; cloud upload failed: ${it.localizedMessage}", done)
             }
