@@ -123,6 +123,7 @@ class MaizeCameraActivity : Activity() {
 
     private fun analyzePhoto() {
         val bitmap = photo ?: return
+        val wasInsectMode = insectMode
         val description = farmerDescription.text.toString().trim().take(700)
         val insectInstructions = if (insectMode) "GRAIN INSECT IDENTIFICATION: Focus on visible insect morphology (snout, antennae, wings, body shape, colour, size), holes in maize kernels and powdery dust. Compare cautiously with maize weevil (Sitophilus zeamais), larger grain borer (Prostephanus truncatus), lesser grain borer (Rhyzopertha dominica), grain moths and other stored-grain insects. Give a likely common and scientific name only if visual evidence supports it; otherwise say unidentified insect, list distinguishing features and request a sharper close-up. Distinguish insects from damage alone. Provide practical non-chemical storage inspection and hygiene steps. Do not recommend unsafe insecticides or claim certainty." else ""
         val combinedDescription = listOf(insectInstructions, description).filter { it.isNotBlank() }.joinToString("\n").take(1900)
@@ -174,7 +175,18 @@ class MaizeCameraActivity : Activity() {
                             val arr = assessment.optJSONArray(key) ?: return ""
                             return (0 until arr.length()).joinToString("\n") { "• " + arr.optString(it) }
                         }
-                        "Subject: ${assessment.optString("subject")}\n\n" +
+                        val suspected = assessment.optString("suspectedCondition", "").trim()
+                        val candidates = suspected.split(Regex("(?i)\\s+or\\s+|\\s*;\\s*")).map { it.trim() }.filter { it.isNotEmpty() }
+                        val primary = candidates.firstOrNull() ?: "Unidentified insect"
+                        val others = candidates.drop(1)
+                        val insectSummary = if (wasInsectMode) {
+                            "🐛 Most likely insect (tentative): $primary\\n\\n" +
+                            "Other possibilities: ${if (others.isEmpty()) "None specified" else others.joinToString("; ")}\\n\\n" +
+                            "Confidence: ${assessment.optString("confidence", "unknown")} (AI assessment, not a measured probability)\\n\\n" +
+                            "Visual evidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\\n\\n" +
+                            "Confirm with a sharper close-up or an expert if uncertain.\\n\\n"
+                        } else ""
+                        insectSummary + "Subject: ${assessment.optString("subject")}\\n\\n" +
                         "Observations:\n${lines("observations")}\n\n" +
                         "🔎 Suspected disease / pest: ${assessment.optString("suspectedCondition", "Not identifiable from this photo")}\n\n" +
                         "Supporting evidence: ${assessment.optString("diagnosticEvidence", "Insufficient visual evidence.")}\n\n" +
