@@ -24,6 +24,8 @@ class MaizeCameraActivity : Activity() {
     private var photo: Bitmap? = null
     private var detailedMode = false
     private var insectMode = false
+    private var diseaseMode = false
+    private var gradingMode = false
     private val cameraRequest = 4101
     private val galleryRequest = 4102
     private val endpoint = "https://maizemate-api-production.up.railway.app/analyze-photo"
@@ -75,6 +77,15 @@ class MaizeCameraActivity : Activity() {
             setOnClickListener { insectMode = true; detailedMode = true; analyzePhoto() }
         })
         root.addView(heading("For insect identification, photograph the insect close up, plus damaged kernels. Add its size, colour, location and any holes or grain dust in the description.", 13f))
+        root.addView(Button(this).apply {
+            text = "🍃 Check maize disease (experimental)"
+            setOnClickListener { diseaseMode = true; detailedMode = true; analyzePhoto() }
+        })
+        root.addView(Button(this).apply {
+            text = "🌽 Assess grain quality (not official grading)"
+            setOnClickListener { gradingMode = true; detailedMode = true; analyzePhoto() }
+        })
+        root.addView(heading("For disease checks, photograph affected and healthy leaves and describe crop age and symptoms. For grain quality, photograph a representative kernel sample; a photo cannot measure moisture or establish an official grade.", 13f))
         val resultScroll = ScrollView(this)
         results = heading("", 14f)
         resultScroll.addView(results)
@@ -124,9 +135,13 @@ class MaizeCameraActivity : Activity() {
     private fun analyzePhoto() {
         val bitmap = photo ?: return
         val wasInsectMode = insectMode
+        val wasDiseaseMode = diseaseMode
+        val wasGradingMode = gradingMode
         val description = farmerDescription.text.toString().trim().take(700)
         val insectInstructions = if (insectMode) "GRAIN INSECT IDENTIFICATION: Focus on visible insect morphology (snout, antennae, wings, body shape, colour, size), holes in maize kernels and powdery dust. Compare cautiously with maize weevil (Sitophilus zeamais), larger grain borer (Prostephanus truncatus), lesser grain borer (Rhyzopertha dominica), grain moths and other stored-grain insects. Give a likely common and scientific name only if visual evidence supports it; otherwise say unidentified insect, list distinguishing features and request a sharper close-up. Distinguish insects from damage alone. Provide practical non-chemical storage inspection and hygiene steps. Do not recommend unsafe insecticides or claim certainty." else ""
-        val combinedDescription = listOf(insectInstructions, description).filter { it.isNotBlank() }.joinToString("\n").take(1900)
+        val diseaseInstructions = if (diseaseMode) "MAIZE DISEASE ASSESSMENT: Describe observed lesion shape, colour, pattern and affected tissue. Compare cautiously with northern corn leaf blight, grey leaf spot, common rust, southern rust, maize streak virus, nutrient deficiency, drought or herbicide injury as appropriate. State one most likely cause only if evidence supports it, list alternatives and specific differentiating signs. Avoid definitive diagnosis; request field history and expert or laboratory confirmation where needed." else ""
+        val gradingInstructions = if (gradingMode) "GRAIN QUALITY PHOTO SCREENING ONLY: Describe visible broken kernels, discolouration, insect holes, mould-like growth and foreign material, with uncertainty. Never claim a South African official maize grade or numerical defect percentages from an uncalibrated photo. Explain that representative sampling, moisture meter readings, defect measurements, applicable South African grading standards and potentially mycotoxin testing are required. Do not declare visibly mouldy grain safe to eat or feed." else ""
+        val combinedDescription = listOf(insectInstructions, diseaseInstructions, gradingInstructions, description).filter { it.isNotBlank() }.joinToString("\n").take(2400)
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
             status.text = "Sign in to MaizeMaster before using online analysis."
@@ -186,7 +201,12 @@ class MaizeCameraActivity : Activity() {
                             "Visual evidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\n\n" +
                             "Confirm with a sharper close-up or an expert if uncertain.\n\n"
                         } else ""
-                        insectSummary + "Subject: ${assessment.optString("subject")}\\n\\n" +
+                        val focusedSummary = when {
+                            wasDiseaseMode -> "🍃 Disease screening (tentative): ${assessment.optString("suspectedCondition", "Uncertain")}\\nEvidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\\n\\n"
+                            wasGradingMode -> "🌽 Visual grain quality screening only — NOT an official grade. Moisture, measured defects, representative sampling and applicable standards are required.\\n\\n"
+                            else -> ""
+                        }
+                        insectSummary + focusedSummary + "Subject: ${assessment.optString("subject")}\\n\\n" +
                         "Observations:\n${lines("observations")}\n\n" +
                         "🔎 Suspected disease / pest: ${assessment.optString("suspectedCondition", "Not identifiable from this photo")}\n\n" +
                         "Supporting evidence: ${assessment.optString("diagnosticEvidence", "Insufficient visual evidence.")}\n\n" +
@@ -201,6 +221,8 @@ class MaizeCameraActivity : Activity() {
                         analyzeButton.isEnabled = true
                         detailedMode = false
                         insectMode = false
+                        diseaseMode = false
+                        gradingMode = false
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
