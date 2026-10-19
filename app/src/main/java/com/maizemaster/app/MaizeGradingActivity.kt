@@ -64,8 +64,10 @@ class MaizeGradingActivity : Activity() {
         })
         root.addView(result)
         root.addView(Button(this).apply {
-            text = "📷 Open AI photo scanner (supporting evidence)"
-            setOnClickListener { startActivity(Intent(this@MaizeGradingActivity, MaizeCameraActivity::class.java)) }
+            text = "📷 Photograph defects — AI estimate Grade 1 / 2 / 3"
+            setOnClickListener {
+                startActivity(Intent(this@MaizeGradingActivity, MaizeCameraActivity::class.java).putExtra("gradingMode", true))
+            }
         })
         root.addView(Button(this).apply {
             text = "← Back"
