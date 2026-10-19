@@ -82,8 +82,8 @@ class MaizeCameraActivity : Activity() {
             setOnClickListener { diseaseMode = true; detailedMode = true; analyzePhoto() }
         })
         root.addView(Button(this).apply {
-            text = "🌽 Assess grain quality (not official grading)"
-            setOnClickListener { gradingMode = true; detailedMode = true; analyzePhoto() }
+            text = "🌽 Open separate Grain Grading page"
+            setOnClickListener { startActivity(Intent(this@MaizeCameraActivity, MaizeGradingActivity::class.java)) }
         })
         root.addView(heading("For disease checks, photograph affected and healthy leaves and describe crop age and symptoms. For grain quality, photograph a representative kernel sample; a photo cannot measure moisture or establish an official grade.", 13f))
         results = heading("", 16f)
