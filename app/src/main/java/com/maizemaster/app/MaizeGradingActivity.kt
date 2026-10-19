@@ -56,7 +56,7 @@ class MaizeGradingActivity : Activity() {
                     val pctUpper = upper / total * 100
                     val pctLower = lower / total * 100
                     result.text = String.format(Locale.US,
-                        "Sample: %.1f g\nDefects above sieve: %.2f%%\nDefects below sieve: %.2f%%\nCombined recorded defects: %.2f%%\n\nSieve: %s\n\nOfficial grade: NOT DETERMINED. Additional tests, defect categories and the applicable South African grading rules are needed.",
+"Sample: %.1f g\nDefects above sieve: %.2f%%\nDefects below sieve: %.2f%%\nCombined recorded defects: %.2f%%\n\nSieve: %s\n\nOfficial grade: NOT DETERMINED. Additional tests, defect categories and the applicable South African grading rules are needed.",
                         total, pctUpper, pctLower, pctUpper + pctLower,
                         sieve.text.toString().ifBlank { "Not specified" })
                 }
