@@ -107,7 +107,7 @@ class MaizeCameraActivity : Activity() {
             text = "← Back to dashboard"
             setOnClickListener { finish() }
         })
-        val pageScroll = ScrollView(this).apply { fillViewport = true }
+        val pageScroll = ScrollView(this).apply { isFillViewport = true }
         pageScroll.addView(root)
         setContentView(pageScroll)
     }
