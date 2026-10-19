@@ -23,6 +23,7 @@ class MaizeCameraActivity : Activity() {
     private lateinit var farmerDescription: EditText
     private var photo: Bitmap? = null
     private var detailedMode = false
+    private var insectMode = false
     private val cameraRequest = 4101
     private val galleryRequest = 4102
     private val endpoint = "https://maizemate-api-production.up.railway.app/analyze-photo"
@@ -69,6 +70,11 @@ class MaizeCameraActivity : Activity() {
             text = "🔬 Deeper analysis (experimental)"
             setOnClickListener { detailedMode = true; analyzePhoto() }
         })
+        root.addView(Button(this).apply {
+            text = "🐛 Identify grain insect (close-up)"
+            setOnClickListener { insectMode = true; detailedMode = true; analyzePhoto() }
+        })
+        root.addView(heading("For insect identification, photograph the insect close up, plus damaged kernels. Add its size, colour, location and any holes or grain dust in the description.", 13f))
         val resultScroll = ScrollView(this)
         results = heading("", 14f)
         resultScroll.addView(results)
@@ -117,7 +123,9 @@ class MaizeCameraActivity : Activity() {
 
     private fun analyzePhoto() {
         val bitmap = photo ?: return
-        val description = farmerDescription.text.toString().trim().take(1000)
+        val description = farmerDescription.text.toString().trim().take(700)
+        val insectInstructions = if (insectMode) "GRAIN INSECT IDENTIFICATION: Focus on visible insect morphology (snout, antennae, wings, body shape, colour, size), holes in maize kernels and powdery dust. Compare cautiously with maize weevil (Sitophilus zeamais), larger grain borer (Prostephanus truncatus), lesser grain borer (Rhyzopertha dominica), grain moths and other stored-grain insects. Give a likely common and scientific name only if visual evidence supports it; otherwise say unidentified insect, list distinguishing features and request a sharper close-up. Distinguish insects from damage alone. Provide practical non-chemical storage inspection and hygiene steps. Do not recommend unsafe insecticides or claim certainty." else ""
+        val combinedDescription = listOf(insectInstructions, description).filter { it.isNotBlank() }.joinToString("\n").take(1900)
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
             status.text = "Sign in to MaizeMaster before using online analysis."
@@ -152,7 +160,7 @@ class MaizeCameraActivity : Activity() {
                         setRequestProperty("Content-Type", "application/json")
                         setRequestProperty("Authorization", "Bearer $token")
                     }
-                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg").put("detailed", detailedMode).put("description", description)
+                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg").put("detailed", detailedMode).put("description", combinedDescription)
                     conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                     val code = conn.responseCode
                     val stream = if (code in 200..299) conn.inputStream else conn.errorStream
@@ -180,6 +188,7 @@ class MaizeCameraActivity : Activity() {
                         status.text = "Analysis complete."
                         analyzeButton.isEnabled = true
                         detailedMode = false
+                        insectMode = false
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
