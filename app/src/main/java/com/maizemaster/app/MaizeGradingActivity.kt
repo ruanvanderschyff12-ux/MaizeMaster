@@ -35,10 +35,9 @@ class MaizeGradingActivity : Activity() {
             }
         }
         root.addView(label("🌽 Maize Grain Grading", 25f))
-        root.addView(label("Enter measured sample weights. This is a defect calculator, not an official grade certificate.", 14f))
+        root.addView(label("Enter sample weight and material passing through the sieve, then photograph defective kernels retained above the sieve. AI grading is provisional.", 14f))
         val sample = weightField("Total sample weight (g)")
-        val retained = weightField("Defective kernels retained above sieve (g)")
-        val below = weightField("Defective material passing through sieve (g)")
+        val below = weightField("Material passing through sieve (g)")
         root.addView(label("Record the sieve specification used and follow the applicable grading standard.", 13f))
         val sieve = EditText(this).apply { hint = "Sieve size / specification (optional)" }
         root.addView(sieve)
@@ -47,17 +46,15 @@ class MaizeGradingActivity : Activity() {
             text = "Calculate measured defects"
             setOnClickListener {
                 val total = sample.text.toString().toDoubleOrNull()
-                val upper = retained.text.toString().toDoubleOrNull()
                 val lower = below.text.toString().toDoubleOrNull()
-                if (total == null || upper == null || lower == null || !total.isFinite() || !upper.isFinite() || !lower.isFinite() ||
-                    total <= 0 || upper < 0 || lower < 0 || upper + lower > total) {
+                if (total == null || lower == null || !total.isFinite() || !lower.isFinite() ||
+                    total <= 0 || lower < 0 || lower > total) {
                     result.text = "Enter valid non-negative weights. Defects must not exceed the total sample weight."
                 } else {
-                    val pctUpper = upper / total * 100
                     val pctLower = lower / total * 100
                     result.text = String.format(Locale.US,
-"Sample: %.1f g\nDefects above sieve: %.2f%%\nDefects below sieve: %.2f%%\nCombined recorded defects: %.2f%%\n\nSieve: %s\n\nOfficial grade: NOT DETERMINED. Additional tests, defect categories and the applicable South African grading rules are needed.",
-                        total, pctUpper, pctLower, pctUpper + pctLower,
+"Sample: %.1f g\nMaterial below sieve: %.2f%%\n\nSieve: %s\n\nPhotograph the retained defective kernels to request an AI-estimated visual grade. Official grade: NOT DETERMINED.",
+                        total, pctLower,
                         sieve.text.toString().ifBlank { "Not specified" })
                 }
             }
