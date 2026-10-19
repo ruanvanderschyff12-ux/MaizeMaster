@@ -164,6 +164,7 @@ class DashboardActivity : Activity() {
             Triple("🤖", "MaizeMate", "Ask maize farming questions") to { openMaizeAi() },
             Triple("📷", "AI Crop Scanner", "Photograph maize crops") to { startActivity(Intent(this, MaizeCameraActivity::class.java)) }
         )
+        content.addView(button("🌽 Grain Grading — Photo Grade Estimate") { startActivity(Intent(this, MaizeGradingActivity::class.java)) })
         for (i in 0 until (items.size + 1) / 2) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             for (j in 0 until 2) {
