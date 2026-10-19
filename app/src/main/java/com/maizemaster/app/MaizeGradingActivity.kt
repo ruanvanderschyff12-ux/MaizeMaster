@@ -71,7 +71,7 @@ class MaizeGradingActivity : Activity() {
             text = "← Back"
             setOnClickListener { finish() }
         })
-        val scroll = ScrollView(this).apply { fillViewport = true }
+        val scroll = ScrollView(this).apply { isFillViewport = true }
         scroll.addView(root)
         setContentView(scroll)
     }
