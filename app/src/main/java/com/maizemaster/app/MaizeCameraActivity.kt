@@ -51,7 +51,7 @@ class MaizeCameraActivity : Activity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Selected maize photo preview"
         }
-        root.addView(preview, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(preview, LinearLayout.LayoutParams(-1, (190 * resources.displayMetrics.density).toInt()))
         status = heading("Choose a photo to begin.", 14f)
         root.addView(status)
         analyzeButton = Button(this).apply {
@@ -86,10 +86,10 @@ class MaizeCameraActivity : Activity() {
             setOnClickListener { gradingMode = true; detailedMode = true; analyzePhoto() }
         })
         root.addView(heading("For disease checks, photograph affected and healthy leaves and describe crop age and symptoms. For grain quality, photograph a representative kernel sample; a photo cannot measure moisture or establish an official grade.", 13f))
-        val resultScroll = ScrollView(this)
-        results = heading("", 14f)
-        resultScroll.addView(results)
-        root.addView(resultScroll, LinearLayout.LayoutParams(-1, 0, 0.75f))
+        results = heading("", 16f)
+        results.setTextColor(Color.rgb(25, 45, 31))
+        root.addView(heading("📋 AI assessment", 19f))
+        root.addView(results)
         root.addView(Button(this).apply {
             text = "📷 Take maize photo"
             setOnClickListener {
@@ -107,7 +107,9 @@ class MaizeCameraActivity : Activity() {
             text = "← Back to dashboard"
             setOnClickListener { finish() }
         })
-        setContentView(root)
+        val pageScroll = ScrollView(this).apply { fillViewport = true }
+        pageScroll.addView(root)
+        setContentView(pageScroll)
     }
 
     @Deprecated("Uses Android activity result callback for compatibility")
@@ -140,7 +142,7 @@ class MaizeCameraActivity : Activity() {
         val description = farmerDescription.text.toString().trim().take(700)
         val insectInstructions = if (insectMode) "GRAIN INSECT IDENTIFICATION: Focus on visible insect morphology (snout, antennae, wings, body shape, colour, size), holes in maize kernels and powdery dust. Compare cautiously with maize weevil (Sitophilus zeamais), larger grain borer (Prostephanus truncatus), lesser grain borer (Rhyzopertha dominica), grain moths and other stored-grain insects. Give a likely common and scientific name only if visual evidence supports it; otherwise say unidentified insect, list distinguishing features and request a sharper close-up. Distinguish insects from damage alone. Provide practical non-chemical storage inspection and hygiene steps. Do not recommend unsafe insecticides or claim certainty." else ""
         val diseaseInstructions = if (diseaseMode) "MAIZE DISEASE ASSESSMENT: Describe observed lesion shape, colour, pattern and affected tissue. Compare cautiously with northern corn leaf blight, grey leaf spot, common rust, southern rust, maize streak virus, nutrient deficiency, drought or herbicide injury as appropriate. State one most likely cause only if evidence supports it, list alternatives and specific differentiating signs. Avoid definitive diagnosis; request field history and expert or laboratory confirmation where needed." else ""
-        val gradingInstructions = if (gradingMode) "GRAIN QUALITY PHOTO SCREENING ONLY: Describe visible broken kernels, discolouration, insect holes, mould-like growth and foreign material, with uncertainty. Never claim a South African official maize grade or numerical defect percentages from an uncalibrated photo. Explain that representative sampling, moisture meter readings, defect measurements, applicable South African grading standards and potentially mycotoxin testing are required. Do not declare visibly mouldy grain safe to eat or feed." else ""
+        val gradingInstructions = if (gradingMode) "GRAIN QUALITY PHOTO SCREENING ONLY: Start the suspectedCondition with a clear tentative VISUAL QUALITY CATEGORY: Appears clean / Visible defects / Possible serious defects / Unable to assess. This is not a regulatory grade and must not use official grade labels. Describe visible broken kernels, discolouration, insect holes, mould-like growth and foreign material, with uncertainty. Never claim a South African official maize grade or numerical defect percentages from an uncalibrated photo. Explain that representative sampling, moisture meter readings, defect measurements, applicable South African grading standards and potentially mycotoxin testing are required. Do not declare visibly mouldy grain safe to eat or feed." else ""
         val combinedDescription = listOf(insectInstructions, diseaseInstructions, gradingInstructions, description).filter { it.isNotBlank() }.joinToString("\n").take(2400)
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
@@ -203,7 +205,7 @@ class MaizeCameraActivity : Activity() {
                         } else ""
                         val focusedSummary = when {
                             wasDiseaseMode -> "🍃 Disease screening (tentative): ${assessment.optString("suspectedCondition", "Uncertain")}\\nEvidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\\n\\n"
-                            wasGradingMode -> "🌽 Visual grain quality screening only — NOT an official grade. Moisture, measured defects, representative sampling and applicable standards are required.\\n\\n"
+                            wasGradingMode -> "🌽 PROVISIONAL VISUAL QUALITY ASSESSMENT\\n${assessment.optString("suspectedCondition", "Unable to assess from photo")}\\n\\nNOT AN OFFICIAL MAIZE GRADE. Moisture, measured defects, representative sampling and applicable standards are required.\\n\\n"
                             else -> ""
                         }
                         insectSummary + focusedSummary + "Subject: ${assessment.optString("subject")}\\n\\n" +
