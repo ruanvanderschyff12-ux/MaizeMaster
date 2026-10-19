@@ -32,6 +32,7 @@ class MaizeCameraActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        gradingMode = intent.getBooleanExtra("gradingMode", false)
         val green = Color.rgb(18, 96, 51)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -44,7 +45,7 @@ class MaizeCameraActivity : Activity() {
             setTextColor(green)
             setPadding(0, 10, 0, 16)
         }
-        root.addView(heading("🌽 MaizeMate Crop Scanner", 25f))
+        root.addView(heading(if (gradingMode) "🌽 MaizeMate Grain Photo Assessment" else "🌽 MaizeMate Crop Scanner", 25f))
         root.addView(heading("Photograph maize plants, leaves, cobs or kernels. Analysis is advisory, not a laboratory diagnosis or official grain grade.", 14f))
         preview = ImageView(this).apply {
             setBackgroundColor(Color.rgb(225, 238, 225))
@@ -68,6 +69,7 @@ class MaizeCameraActivity : Activity() {
         root.addView(heading("What are you seeing? (optional)", 16f))
         root.addView(farmerDescription)
         root.addView(analyzeButton)
+        if (gradingMode) analyzeButton.text = "🌽 Estimate visual grade (1 / 2 / 3)"
         root.addView(Button(this).apply {
             text = "🔬 Deeper analysis (experimental)"
             setOnClickListener { detailedMode = true; analyzePhoto() }
@@ -142,7 +144,7 @@ class MaizeCameraActivity : Activity() {
         val description = farmerDescription.text.toString().trim().take(700)
         val insectInstructions = if (insectMode) "GRAIN INSECT IDENTIFICATION: Focus on visible insect morphology (snout, antennae, wings, body shape, colour, size), holes in maize kernels and powdery dust. Compare cautiously with maize weevil (Sitophilus zeamais), larger grain borer (Prostephanus truncatus), lesser grain borer (Rhyzopertha dominica), grain moths and other stored-grain insects. Give a likely common and scientific name only if visual evidence supports it; otherwise say unidentified insect, list distinguishing features and request a sharper close-up. Distinguish insects from damage alone. Provide practical non-chemical storage inspection and hygiene steps. Do not recommend unsafe insecticides or claim certainty." else ""
         val diseaseInstructions = if (diseaseMode) "MAIZE DISEASE ASSESSMENT: Describe observed lesion shape, colour, pattern and affected tissue. Compare cautiously with northern corn leaf blight, grey leaf spot, common rust, southern rust, maize streak virus, nutrient deficiency, drought or herbicide injury as appropriate. State one most likely cause only if evidence supports it, list alternatives and specific differentiating signs. Avoid definitive diagnosis; request field history and expert or laboratory confirmation where needed." else ""
-        val gradingInstructions = if (gradingMode) "GRAIN QUALITY PHOTO SCREENING ONLY: Start the suspectedCondition with a clear tentative VISUAL QUALITY CATEGORY: Appears clean / Visible defects / Possible serious defects / Unable to assess. This is not a regulatory grade and must not use official grade labels. Describe visible broken kernels, discolouration, insect holes, mould-like growth and foreign material, with uncertainty. Never claim a South African official maize grade or numerical defect percentages from an uncalibrated photo. Explain that representative sampling, moisture meter readings, defect measurements, applicable South African grading standards and potentially mycotoxin testing are required. Do not declare visibly mouldy grain safe to eat or feed." else ""
+        val gradingInstructions = if (gradingMode) "GRAIN QUALITY PHOTO SCREENING ONLY: Assess the image and give a cautious preliminary Grade 1, Grade 2, or Grade 3 suggestion ONLY when sufficient visible evidence supports a rough visual tier; otherwise say Cannot estimate. Put the suggested grade at the start of suspectedCondition as AI-estimated Grade 1 / AI-estimated Grade 2 / AI-estimated Grade 3 / Cannot estimate, followed by brief reasons. Do not claim this is a verified South African regulated grade; real grade thresholds require measured defects and moisture. Start the suspectedCondition with a clear tentative VISUAL QUALITY CATEGORY: Appears clean / Visible defects / Possible serious defects / Unable to assess. This is not a regulatory grade and must not use official grade labels. Describe visible broken kernels, discolouration, insect holes, mould-like growth and foreign material, with uncertainty. Never claim a South African official maize grade or numerical defect percentages from an uncalibrated photo. Explain that representative sampling, moisture meter readings, defect measurements, applicable South African grading standards and potentially mycotoxin testing are required. Do not declare visibly mouldy grain safe to eat or feed." else ""
         val combinedDescription = listOf(insectInstructions, diseaseInstructions, gradingInstructions, description).filter { it.isNotBlank() }.joinToString("\n").take(2400)
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
@@ -205,7 +207,7 @@ class MaizeCameraActivity : Activity() {
                         } else ""
                         val focusedSummary = when {
                             wasDiseaseMode -> "🍃 Disease screening (tentative): ${assessment.optString("suspectedCondition", "Uncertain")}\\nEvidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\\n\\n"
-                            wasGradingMode -> "🌽 PROVISIONAL VISUAL QUALITY ASSESSMENT\\n${assessment.optString("suspectedCondition", "Unable to assess from photo")}\\n\\nNOT AN OFFICIAL MAIZE GRADE. Moisture, measured defects, representative sampling and applicable standards are required.\\n\\n"
+                            wasGradingMode -> "🌽 AI-ESTIMATED GRADE (PHOTO ONLY)\\n${assessment.optString("suspectedCondition", "Cannot estimate")}\\n\\nNOT AN OFFICIAL MAIZE GRADE. Moisture, measured defects, representative sampling and applicable standards are required.\\n\\n"
                             else -> ""
                         }
                         insectSummary + focusedSummary + "Subject: ${assessment.optString("subject")}\\n\\n" +
