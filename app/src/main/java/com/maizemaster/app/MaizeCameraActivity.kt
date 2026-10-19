@@ -21,6 +21,7 @@ class MaizeCameraActivity : Activity() {
     private lateinit var analyzeButton: Button
     private lateinit var results: TextView
     private var photo: Bitmap? = null
+    private var detailedMode = false
     private val cameraRequest = 4101
     private val galleryRequest = 4102
     private val endpoint = "https://maizemate-api-production.up.railway.app/analyze-photo"
@@ -55,6 +56,10 @@ class MaizeCameraActivity : Activity() {
             setOnClickListener { analyzePhoto() }
         }
         root.addView(analyzeButton)
+        root.addView(Button(this).apply {
+            text = "🔬 Deeper analysis (experimental)"
+            setOnClickListener { detailedMode = true; analyzePhoto() }
+        })
         val resultScroll = ScrollView(this)
         results = heading("", 14f)
         resultScroll.addView(results)
@@ -137,7 +142,7 @@ class MaizeCameraActivity : Activity() {
                         setRequestProperty("Content-Type", "application/json")
                         setRequestProperty("Authorization", "Bearer $token")
                     }
-                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg")
+                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg").put("detailed", detailedMode)
                     conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                     val code = conn.responseCode
                     val stream = if (code in 200..299) conn.inputStream else conn.errorStream
@@ -162,11 +167,13 @@ class MaizeCameraActivity : Activity() {
                         results.text = formatted
                         status.text = "Analysis complete."
                         analyzeButton.isEnabled = true
+                        detailedMode = false
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         status.text = "Analysis unavailable: ${e.message ?: "Please try again."}"
                         analyzeButton.isEnabled = true
+                        detailedMode = false
                     }
                 }
             }.start()
