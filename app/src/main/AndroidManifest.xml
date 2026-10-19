@@ -16,6 +16,7 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity android:name=".FarmerAccountActivity" android:exported="false" />
+        <activity android:name=".MaizeGradingActivity" android:exported="false" />
         <activity android:name=".MaizeCameraActivity" android:exported="false" />
         <activity android:name=".MaizeAiActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".GrowthActivity" android:exported="false" />
