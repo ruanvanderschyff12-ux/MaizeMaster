@@ -180,11 +180,11 @@ class MaizeCameraActivity : Activity() {
                         val primary = candidates.firstOrNull() ?: "Unidentified insect"
                         val others = candidates.drop(1)
                         val insectSummary = if (wasInsectMode) {
-                            "🐛 Most likely insect (tentative): $primary\\n\\n" +
-                            "Other possibilities: ${if (others.isEmpty()) "None specified" else others.joinToString("; ")}\\n\\n" +
-                            "Confidence: ${assessment.optString("confidence", "unknown")} (AI assessment, not a measured probability)\\n\\n" +
-                            "Visual evidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\\n\\n" +
-                            "Confirm with a sharper close-up or an expert if uncertain.\\n\\n"
+                            "🐛 Most likely insect (tentative): $primary\n\n" +
+                            "Other possibilities: ${if (others.isEmpty()) "None specified" else others.joinToString("; ")}\n\n" +
+                            "Confidence: ${assessment.optString("confidence", "unknown")} (AI assessment, not a measured probability)\n\n" +
+                            "Visual evidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\n\n" +
+                            "Confirm with a sharper close-up or an expert if uncertain.\n\n"
                         } else ""
                         insectSummary + "Subject: ${assessment.optString("subject")}\\n\\n" +
                         "Observations:\n${lines("observations")}\n\n" +
