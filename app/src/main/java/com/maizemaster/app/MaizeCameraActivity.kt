@@ -20,6 +20,7 @@ class MaizeCameraActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var analyzeButton: Button
     private lateinit var results: TextView
+    private lateinit var farmerDescription: EditText
     private var photo: Bitmap? = null
     private var detailedMode = false
     private val cameraRequest = 4101
@@ -55,6 +56,14 @@ class MaizeCameraActivity : Activity() {
             isEnabled = false
             setOnClickListener { analyzePhoto() }
         }
+        farmerDescription = EditText(this).apply {
+            hint = "Describe symptoms, when they started, and where you noticed them (optional)"
+            minLines = 2
+            maxLines = 4
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+        }
+        root.addView(heading("What are you seeing? (optional)", 16f))
+        root.addView(farmerDescription)
         root.addView(analyzeButton)
         root.addView(Button(this).apply {
             text = "🔬 Deeper analysis (experimental)"
@@ -108,6 +117,7 @@ class MaizeCameraActivity : Activity() {
 
     private fun analyzePhoto() {
         val bitmap = photo ?: return
+        val description = farmerDescription.text.toString().trim().take(1000)
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
             status.text = "Sign in to MaizeMaster before using online analysis."
@@ -142,7 +152,7 @@ class MaizeCameraActivity : Activity() {
                         setRequestProperty("Content-Type", "application/json")
                         setRequestProperty("Authorization", "Bearer $token")
                     }
-                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg").put("detailed", detailedMode)
+                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg").put("detailed", detailedMode).put("description", description)
                     conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                     val code = conn.responseCode
                     val stream = if (code in 200..299) conn.inputStream else conn.errorStream
@@ -158,6 +168,8 @@ class MaizeCameraActivity : Activity() {
                         }
                         "Subject: ${assessment.optString("subject")}\n\n" +
                         "Observations:\n${lines("observations")}\n\n" +
+                        "🔎 Suspected disease / pest: ${assessment.optString("suspectedCondition", "Not identifiable from this photo")}\n\n" +
+                        "Supporting evidence: ${assessment.optString("diagnosticEvidence", "Insufficient visual evidence.")}\n\n" +
                         "Possible causes:\n${lines("possibleCauses")}\n\n" +
                         "Confidence: ${assessment.optString("confidence")}\n\n" +
                         "Recommended checks:\n${lines("recommendations")}\n\n" +
