@@ -1,6 +1,7 @@
 package com.maizemaster.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -30,6 +31,7 @@ class GrowthActivity : Activity() {
         setColor(Color.WHITE)
         cornerRadius = dp(16).toFloat()
     }
+    private fun openPlanting() = startActivity(Intent(this, MainActivity::class.java).putExtra("open_section", 2))
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = dark
@@ -54,6 +56,20 @@ class GrowthActivity : Activity() {
             }
             body.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
             card.addView(text("🌽 " + field.name, 19f, true))
+            card.setOnClickListener {
+                if (field.plantingDate.isBlank() || field.maturityDays <= 0) {
+                    openPlanting()
+                } else {
+                    val growth = WeatherGrowthEstimator.calculate(this@GrowthActivity, field).result
+                    AlertDialog.Builder(this@GrowthActivity)
+                        .setTitle("🌽 " + field.name)
+                        .setMessage("Estimated stage: " + growth.stage + "\nProgress: " + growth.progressPercent + "%\n\n" + growth.advice)
+                        .setPositiveButton("Close", null)
+                        .setNeutralButton("Planting details") { _, _ -> openPlanting() }
+                        .show()
+                }
+            }
+
             if (field.plantingDate.isBlank() || field.maturityDays <= 0) {
                 card.addView(text("Set the planting date and expected maturity days in My Fields."))
             } else {
@@ -114,7 +130,7 @@ class GrowthActivity : Activity() {
             isAllCaps = false
             setTextColor(Color.WHITE)
             backgroundTintList = android.content.res.ColorStateList.valueOf(green)
-            setOnClickListener { startActivity(Intent(this@GrowthActivity, MainActivity::class.java)) }
+            setOnClickListener { openPlanting() }
         })
     }
 }
