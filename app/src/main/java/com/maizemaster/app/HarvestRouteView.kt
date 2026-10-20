@@ -135,19 +135,49 @@ class HarvestRouteView(context: Context) : View(context) {
             if (lat.isFinite() && lon.isFinite()) boundaryPoints.add(lat to lon)
         }
         if (boundaryPoints.size < 3) {
+            // A field without a surveyed GPS boundary cannot be aligned to the preview.
+            // Display an independent GPS route with a moving blue position marker.
             drawMaizeField(canvas)
-            // Without a surveyed boundary, show a location indicator separately.
-            // Do not pretend the GPS fix is georeferenced inside the designer field.
-            if (livePosition.length() >= 2) {
-                val d = resources.displayMetrics.density
+            val liveLat = livePosition.optDouble(0, Double.NaN)
+            val liveLon = livePosition.optDouble(1, Double.NaN)
+            val fixes = points.toMutableList()
+            if (liveLat.isFinite() && liveLon.isFinite()) fixes.add(liveLat to liveLon)
+            if (fixes.isNotEmpty()) {
+                val centerLat = fixes.first().first
+                val centerLon = fixes.first().second
+                val factor = cos(Math.toRadians(centerLat)).coerceAtLeast(0.01)
+                val east = fixes.map { (it.second - centerLon) * 111320.0 * factor }
+                val north = fixes.map { (it.first - centerLat) * 111320.0 }
+                val extent = max(25.0, max((east.maxOrNull() ?: 0.0) - (east.minOrNull() ?: 0.0),
+                    (north.maxOrNull() ?: 0.0) - (north.minOrNull() ?: 0.0)))
+                val scale = minOf(width, height) * 0.65 / extent
+                val centerEast = ((east.minOrNull() ?: 0.0) + (east.maxOrNull() ?: 0.0)) / 2
+                val centerNorth = ((north.minOrNull() ?: 0.0) + (north.maxOrNull() ?: 0.0)) / 2
+                fun px(i: Int) = (width / 2.0 + (east[i] - centerEast) * scale).toFloat()
+                fun py(i: Int) = (height / 2.0 - (north[i] - centerNorth) * scale).toFloat()
+                if (points.size >= 2) {
+                    val routePath = Path().apply {
+                        moveTo(px(0), py(0))
+                        for (i in 1 until points.size) lineTo(px(i), py(i))
+                    }
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = 5f * resources.displayMetrics.density
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.color = Color.rgb(143, 99, 57)
+                    canvas.drawPath(routePath, paint)
+                }
+                val last = fixes.lastIndex
+                val density = resources.displayMetrics.density
                 paint.style = Paint.Style.FILL
-                paint.color = Color.rgb(0, 101, 208)
-                canvas.drawCircle(width - 25f*d, 25f*d, 9f*d, paint)
+                paint.color = Color.argb(75, 0, 108, 226)
+                canvas.drawCircle(px(last), py(last), 16f * density, paint)
                 paint.color = Color.WHITE
-                canvas.drawCircle(width - 25f*d, 25f*d, 4f*d, paint)
-                paint.color = Color.rgb(16, 78, 60)
-                paint.textSize = 11f*d
-                canvas.drawText("GPS fix (field not aligned)", 12f*d, 24f*d, paint)
+                canvas.drawCircle(px(last), py(last), 10f * density, paint)
+                paint.color = Color.rgb(0, 108, 226)
+                canvas.drawCircle(px(last), py(last), 7f * density, paint)
+                paint.textSize = 11f * density
+                paint.color = Color.rgb(8, 65, 40)
+                canvas.drawText("GPS route • field outline not aligned", 10f * density, 18f * density, paint)
             }
             canvas.restore()
             return
