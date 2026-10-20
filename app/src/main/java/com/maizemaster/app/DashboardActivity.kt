@@ -159,7 +159,7 @@ class DashboardActivity : Activity() {
             Triple("🗺️", "Field Designer", "Design your field") to { openFields(1) },
             Triple("🌤️", "Weather", "Forecast & risks") to { openWeather() },
             Triple("🌱", "Growth Stages", "Follow crop growth") to { openGrowth() },
-            Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields(3) },
+            Triple("🌽", "Yield Estimator", "Estimate your harvest") to { startActivity(Intent(this, YieldEstimatorActivity::class.java)) },
             Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { DiseaseGuide.show(this) },
             Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openHarvest() },
             Triple("🤖", "MaizeMate", "Ask maize farming questions") to { openMaizeAi() },
