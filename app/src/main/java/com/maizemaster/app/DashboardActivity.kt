@@ -48,7 +48,7 @@ class DashboardActivity : Activity() {
         background = shape(green, 13)
         setOnClickListener { action() }
     }
-    private fun openFields() = startActivity(Intent(this, MainActivity::class.java))
+    private fun openFields(section: Int = 4) = startActivity(Intent(this, MainActivity::class.java).putExtra("open_section", section))
     private fun openWeather() = startActivity(Intent(this, WeatherActivity::class.java))
     private fun openGrowth() = startActivity(Intent(this, GrowthActivity::class.java))
     private fun openHarvest() = startActivity(Intent(this, HarvestActivity::class.java))
@@ -155,10 +155,10 @@ class DashboardActivity : Activity() {
         })
 
         val items = listOf(
-            Triple("🗺️", "Field Designer", "Design your field") to { openFields() },
+            Triple("🗺️", "Field Designer", "Design your field") to { openFields(1) },
             Triple("🌤️", "Weather", "Forecast & risks") to { openWeather() },
             Triple("🌱", "Growth Stages", "Follow crop growth") to { openGrowth() },
-            Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields() },
+            Triple("🌽", "Yield Estimator", "Estimate your harvest") to { openFields(3) },
             Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { DiseaseGuide.show(this) },
             Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openHarvest() },
             Triple("🤖", "MaizeMate", "Ask maize farming questions") to { openMaizeAi() },
