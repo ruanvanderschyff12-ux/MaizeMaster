@@ -1477,6 +1477,10 @@ class MainActivity : Activity() {
         // INITIAL DASHBOARD
 
         refreshList()
-        showPage(0)
+        // Open the requested section directly from the dashboard instead of
+        // briefly showing Home and resetting the user's destination.
+        val requestedSection = intent.getIntExtra("open_section", 0).coerceIn(0, pages.lastIndex)
+        pageSelector.setSelection(requestedSection)
+        showPage(requestedSection)
     }
 }
