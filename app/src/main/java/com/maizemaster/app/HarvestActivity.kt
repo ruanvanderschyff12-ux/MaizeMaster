@@ -46,7 +46,7 @@ class HarvestActivity : Activity() {
                 view.route = try { JSONArray(trips.getString("${id}_gps_route", "[]")) } catch (_: Exception) { JSONArray() }
                 view.livePosition = try { JSONArray(trips.getString("${id}_live_position", "[]")) } catch (_: Exception) { JSONArray() }
             }
-            refreshHandler.postDelayed(this, 3000L)
+            refreshHandler.postDelayed(this, 1000L)
         }
     }
     override fun onResume() {
