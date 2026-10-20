@@ -20,6 +20,7 @@
         <activity android:name=".MaizeCameraActivity" android:exported="false" />
         <activity android:name=".MaizeAiActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".YieldEstimatorActivity" android:exported="false" />
+        <activity android:name=".GrowthFieldDetailActivity" android:exported="false" />
         <activity android:name=".GrowthActivity" android:exported="false" />
         <activity android:name=".HarvestActivity" android:exported="false" />
         <activity android:name=".FieldBoundaryActivity" android:exported="false" />

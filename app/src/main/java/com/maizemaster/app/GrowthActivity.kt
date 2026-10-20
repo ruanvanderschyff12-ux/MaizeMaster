@@ -32,6 +32,11 @@ class GrowthActivity : Activity() {
         cornerRadius = dp(16).toFloat()
     }
     private fun openPlanting() = startActivity(Intent(this, MainActivity::class.java).putExtra("open_section", 2))
+    override fun onResume() {
+        super.onResume()
+        if (hasOpened) { hasOpened = false; recreate() }
+    }
+    private var hasOpened = false
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = dark
@@ -56,18 +61,12 @@ class GrowthActivity : Activity() {
             }
             body.addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
             card.addView(text("🌽 " + field.name, 19f, true))
+            card.isClickable = true
+            card.isFocusable = true
             card.setOnClickListener {
-                if (field.plantingDate.isBlank() || field.maturityDays <= 0) {
-                    openPlanting()
-                } else {
-                    val growth = WeatherGrowthEstimator.calculate(this@GrowthActivity, field).result
-                    AlertDialog.Builder(this@GrowthActivity)
-                        .setTitle("🌽 " + field.name)
-                        .setMessage("Estimated stage: " + growth.stage + "\nProgress: " + growth.progressPercent + "%\n\n" + growth.advice)
-                        .setPositiveButton("Close", null)
-                        .setNeutralButton("Planting details") { _, _ -> openPlanting() }
-                        .show()
-                }
+                hasOpened = true
+                startActivity(Intent(this@GrowthActivity, GrowthFieldDetailActivity::class.java)
+                    .putExtra("field_id", field.id))
             }
 
             if (field.plantingDate.isBlank() || field.maturityDays <= 0) {
