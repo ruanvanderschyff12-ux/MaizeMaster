@@ -34,6 +34,10 @@ class HarvestGpsService : Service(), LocationListener {
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                // A new trip must not inherit the previous trip’s GPS position or distance baseline.
+                try { manager?.removeUpdates(this) } catch (_: Exception) {}
+                manager = null
+                previous = null
                 fieldId = id
                 startTracking()
             }
@@ -72,7 +76,14 @@ class HarvestGpsService : Service(), LocationListener {
         }
         try {
             manager = getSystemService(LOCATION_SERVICE) as LocationManager
-            manager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 3000L, 4f, this)
+            manager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this)
+            // Seed the marker immediately when a recent accurate fix exists, even before movement.
+            @Suppress("DEPRECATION")
+            val recent = manager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            if (recent != null && System.currentTimeMillis() - recent.time in 0..30000 &&
+                recent.hasAccuracy() && recent.accuracy <= 40f) {
+                onLocationChanged(recent)
+            }
             if (manager?.isProviderEnabled(LocationManager.GPS_PROVIDER) != true) {
                 preferences.edit().putString("${id}_gps_error", "Enable GPS location on your phone.").apply()
             }
