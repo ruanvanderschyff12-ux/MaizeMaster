@@ -9,6 +9,10 @@ import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.widget.*
 import java.util.Locale
+import com.google.firebase.auth.FirebaseAuth
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * Built-in maize guidance. This is intentionally not presented as a live AI model.
@@ -22,6 +26,9 @@ class MaizeAiActivity : Activity() {
     private lateinit var conversation: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var question: EditText
+    private lateinit var connectionStatus: TextView
+    private var waiting = false
+    private val endpoint = "https://maizemate-api-production.up.railway.app/chat"
 
     private fun dp(n: Int) = (n * resources.displayMetrics.density + 0.5f).toInt()
     private fun background(color: Int) = GradientDrawable().apply {
@@ -84,11 +91,66 @@ class MaizeAiActivity : Activity() {
         }
     }
     private fun submit() {
+        if (waiting) return
         val prompt = question.text.toString().trim()
         if (prompt.isEmpty()) return
         question.setText("")
         addBubble(prompt, true)
-        addBubble(answer(prompt), false)
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            connectionStatus.text = "● Offline guidance — sign in for online AI"
+            addBubble(answer(prompt), false)
+            return
+        }
+        waiting = true
+        connectionStatus.text = "● Connecting to online AI…"
+        user.getIdToken(false).addOnCompleteListener { task ->
+            val token = if (task.isSuccessful) task.result?.token else null
+            if (token.isNullOrBlank()) {
+                showFallback(prompt, "Could not verify sign-in")
+                return@addOnCompleteListener
+            }
+            Thread {
+                var conn: HttpURLConnection? = null
+                try {
+                    conn = URL(endpoint).openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.connectTimeout = 12000
+                    conn.readTimeout = 30000
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/json")
+                    conn.setRequestProperty("Authorization", "Bearer $token")
+                    conn.outputStream.use { it.write(JSONObject().put("message", prompt).toString().toByteArray(Charsets.UTF_8)) }
+                    val code = conn.responseCode
+                    val body = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                        ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                    val result = JSONObject(body)
+                    if (code !in 200..299) throw IllegalStateException(
+                        when (code) {
+                            401 -> "Session expired — sign in again"
+                            429 -> "AI is busy — try again later"
+                            else -> result.optString("error", "Online AI unavailable")
+                        }
+                    )
+                    val reply = result.optString("reply").trim()
+                    if (reply.isEmpty()) throw IllegalStateException("No AI answer received")
+                    runOnUiThread {
+                        waiting = false
+                        connectionStatus.text = "● Online AI connected"
+                        addBubble(reply, false)
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread { showFallback(prompt, e.message ?: "Connection failed") }
+                } finally {
+                    conn?.disconnect()
+                }
+            }.start()
+        }
+    }
+    private fun showFallback(prompt: String, reason: String) {
+        waiting = false
+        connectionStatus.text = "● Offline guidance — online AI unavailable"
+        addBubble("Online AI unavailable ($reason). Here's offline guidance:\\n\\n" + answer(prompt), false)
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,10 +179,11 @@ class MaizeAiActivity : Activity() {
             setTextColor(gold)
             letterSpacing = 0.08f
         })
-        branding.addView(text("●  Offline guidance", 12f).apply {
+        connectionStatus = text("● Ready to connect to online AI", 12f).apply {
             setTextColor(Color.rgb(202, 237, 210))
             setPadding(0, dp(6), 0, 0)
-        })
+        }
+        branding.addView(connectionStatus)
         header.addView(branding, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(header, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
 
@@ -142,7 +205,7 @@ class MaizeAiActivity : Activity() {
         }
         scroll.addView(conversation)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        addBubble("Hi! I'm MaizeMate 🌽🤖\\n\\nAsk me about maize plants, kernels, crop diseases or grain insects. For now I provide built-in guidance; live AI and photo diagnosis are coming later.", false)
+        addBubble("Hi! I'm MaizeMate 🌽🤖\\n\\nAsk me about maize plants, kernels, crop diseases or grain insects. I use online AI when available and built-in guidance when offline.", false)
 
         val suggestions = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
