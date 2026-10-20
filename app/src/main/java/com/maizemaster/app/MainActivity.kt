@@ -491,7 +491,7 @@ class MainActivity : Activity() {
         plantingCard.addView(maizeSelector)
 
         val yieldInput = input("Expected tons per hectare")
-        plantingCard.addView(yieldInput)
+        // Keep existing field data intact; yield entry now belongs to Yield Estimator.
         plantingPage.addView(plantingCard)
 
         // HARVEST ESTIMATE
