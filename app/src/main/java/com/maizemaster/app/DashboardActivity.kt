@@ -48,6 +48,7 @@ class DashboardActivity : Activity() {
         background = shape(green, 13)
         setOnClickListener { action() }
     }
+    // Route each dashboard shortcut to its own field section.
     private fun openFields(section: Int = 4) = startActivity(Intent(this, MainActivity::class.java).putExtra("open_section", section))
     private fun openWeather() = startActivity(Intent(this, WeatherActivity::class.java))
     private fun openGrowth() = startActivity(Intent(this, GrowthActivity::class.java))
