@@ -196,7 +196,11 @@ class HarvestActivity : Activity() {
                 gpsLabels[field.id] = gpsLabel
                 gpsFields[field.id] = field
                 card.addView(gpsLabel)
-                card.addView(label("LIVE GPS HARVEST ROUTE", 13f, true))
+            }
+            // Keep the map visible between trips so saved harvested passes remain visible.
+            // The route view reads historical paths without resetting recorded totals.
+            run {
+                card.addView(label(if (active != null) "LIVE GPS HARVEST ROUTE" else "SAVED HARVEST MAP", 13f, true))
                 val map = HarvestRouteView(this).apply {
                     fieldShape = field.shape
                     rowSpacing = field.rowSpacing
