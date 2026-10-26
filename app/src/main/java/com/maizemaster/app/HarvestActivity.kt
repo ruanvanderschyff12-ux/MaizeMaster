@@ -271,7 +271,7 @@ class HarvestActivity : Activity() {
         fun updateEstimate() {
             val w = width.text.toString().toDoubleOrNull() ?: 0.0
             val area = if (points >= 2 && w in 0.1..30.0) (meters * w / 10000.0).coerceAtMost(remaining) else 0.0
-            hectares.setText(String.format(Locale.US, "%.3f", area))
+            hectares.setText(java.math.BigDecimal.valueOf(area).setScale(3, java.math.RoundingMode.DOWN).toPlainString())
             tons.setText(String.format(Locale.US, "%.2f", area * field.expectedYield))
             if (w in 0.1..30.0) trips.edit().putFloat("${field.id}_cutting_width", w.toFloat()).apply()
             guidance.text = String.format(Locale.US, "GPS: %.2f km, %d movements. Area: %.3f ha. Check overlaps and measured load weight.", meters / 1000.0, points, area)
@@ -299,11 +299,11 @@ class HarvestActivity : Activity() {
                 val h = hectares.text.toString().toDoubleOrNull()
                 if (t == null || h == null || !t.isFinite() || !h.isFinite() ||
                     t < 0 || h < 0 || t + h <= 0 ||
-                    field.harvestedHectares + h > field.hectares() + 0.000001) {
+                    h > remaining + 0.000001) {
                     Toast.makeText(this, "Enter valid trip amounts within the remaining field area.", Toast.LENGTH_LONG).show()
                 } else {
                     field.harvestedTons += t
-                    field.harvestedHectares += h
+                    field.harvestedHectares = (field.harvestedHectares + h).coerceAtMost(field.hectares())
                     if (!storage.updateField(field)) {
                         Toast.makeText(this, "Could not save harvest; trip remains active.", Toast.LENGTH_LONG).show()
                         return@setOnClickListener
