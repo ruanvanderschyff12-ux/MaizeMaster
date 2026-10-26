@@ -33,6 +33,8 @@ class HarvestRouteView(context: Context) : View(context) {
     var route = JSONArray()
         set(value) { field = value; invalidate() }
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    var followLocation = false
+        set(value) { field = value; zoom = 1f; panX = 0f; panY = 0f; invalidate() }
     private var zoom = 1f
     private var panX = 0f
     private var panY = 0f
@@ -49,7 +51,32 @@ class HarvestRouteView(context: Context) : View(context) {
 
     // This preview is read-only so vertical swipes always reach the parent ScrollView.
     // GPS recording and live route drawing continue independently.
-    override fun onTouchEvent(event: MotionEvent): Boolean = false
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        zoomDetector.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                lastX = event.x
+                lastY = event.y
+                parent?.requestDisallowInterceptTouchEvent(true)
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (event.pointerCount == 1 && !zoomDetector.isInProgress) {
+                    panX += event.x - lastX
+                    panY += event.y - lastY
+                    invalidate()
+                }
+                lastX = event.x
+                lastY = event.y
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                parent?.requestDisallowInterceptTouchEvent(false)
+                return true
+            }
+        }
+        return true
+    }
 
     private fun drawMaizeField(canvas: Canvas, outline: Path? = null) {
         val density = resources.displayMetrics.density
@@ -221,12 +248,12 @@ class HarvestRouteView(context: Context) : View(context) {
         val hasLive = liveLat.isFinite() && liveLon.isFinite()
         val liveEast = if (hasLive) (liveLon - lonCenter) * 111320.0 * factor else 0.0
         val liveNorth = if (hasLive) (liveLat - latCenter) * 111320.0 else 0.0
-        val west = minOf(boundaryEast.minOrNull() ?: 0.0, if (hasLive) liveEast else Double.POSITIVE_INFINITY)
-        val eastLimit = maxOf(boundaryEast.maxOrNull() ?: 0.0, if (hasLive) liveEast else Double.NEGATIVE_INFINITY)
-        val south = minOf(boundaryNorth.minOrNull() ?: 0.0, if (hasLive) liveNorth else Double.POSITIVE_INFINITY)
-        val northLimit = maxOf(boundaryNorth.maxOrNull() ?: 0.0, if (hasLive) liveNorth else Double.NEGATIVE_INFINITY)
-        val centerEast = (west + eastLimit) / 2.0
-        val centerNorth = (south + northLimit) / 2.0
+        val west = boundaryEast.minOrNull() ?: 0.0
+        val eastLimit = boundaryEast.maxOrNull() ?: 0.0
+        val south = boundaryNorth.minOrNull() ?: 0.0
+        val northLimit = boundaryNorth.maxOrNull() ?: 0.0
+        val centerEast = if (followLocation && hasLive) liveEast else (west + eastLimit) / 2.0
+        val centerNorth = if (followLocation && hasLive) liveNorth else (south + northLimit) / 2.0
         val extent = max(20.0, max(eastLimit - west, northLimit - south))
         val scale = (minOf(width, height) * 0.8) / extent
         fun x(i: Int) = (width / 2.0 + (east[i] - centerEast) * scale).toFloat()
