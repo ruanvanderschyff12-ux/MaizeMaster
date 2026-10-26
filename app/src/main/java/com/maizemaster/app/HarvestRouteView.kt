@@ -137,83 +137,75 @@ class HarvestRouteView(context: Context) : View(context) {
             if (lat.isFinite() && lon.isFinite()) boundaryPoints.add(lat to lon)
         }
         if (boundaryPoints.size < 3) {
-            // A field without a surveyed GPS boundary cannot be aligned to the preview.
-            // Display an independent GPS route with a moving blue position marker.
             drawMaizeField(canvas)
             val liveLat = livePosition.optDouble(0, Double.NaN)
             val liveLon = livePosition.optDouble(1, Double.NaN)
-            val fixes = points.toMutableList()
-            if (liveLat.isFinite() && liveLon.isFinite()) fixes.add(liveLat to liveLon)
-            // Keep the view centred on the current trip, not old routes from other locations.
-            // Draw completed passes only if they fit near the current trip.
-            // No surveyed boundary means the drawn field is illustrative only.
-            for (j in 0 until previousRoutes.length()) {
-                val saved = previousRoutes.optJSONObject(j)?.optJSONArray("route") ?: continue
-                for (k in 0 until saved.length()) {
-                    val coord = saved.optJSONArray(k) ?: continue
-                    val lat = coord.optDouble(0, Double.NaN)
-                    val lon = coord.optDouble(1, Double.NaN)
-                    if (lat.isFinite() && lon.isFinite() && fixes.isEmpty()) fixes.add(lat to lon)
-                }
-            }
-            if (fixes.isNotEmpty()) {
-                val centerLat = if (liveLat.isFinite()) liveLat else fixes.first().first
-                val centerLon = if (liveLon.isFinite()) liveLon else fixes.first().second
-                val factor = cos(Math.toRadians(centerLat)).coerceAtLeast(0.01)
-                val east = fixes.map { (it.second - centerLon) * 111320.0 * factor }
-                val north = fixes.map { (it.first - centerLat) * 111320.0 }
-                val extent = max(25.0, max((east.maxOrNull() ?: 0.0) - (east.minOrNull() ?: 0.0),
-                    (north.maxOrNull() ?: 0.0) - (north.minOrNull() ?: 0.0)))
+            val hasLive = liveLat.isFinite() && liveLon.isFinite()
+            val anchor = if (hasLive) Pair(liveLat, liveLon) else points.lastOrNull()
+            if (anchor != null) {
+                val factor = cos(Math.toRadians(anchor.first)).coerceAtLeast(0.01)
+                fun local(p: Pair<Double, Double>) = Pair(
+                    (p.second - anchor.second) * 111320.0 * factor,
+                    (p.first - anchor.first) * 111320.0)
+                // Only current route determines zoom; distant old routes cannot hide the blue dot.
+                val current = points.map(::local)
+                val extent = max(40.0, max(
+                    (current.maxOfOrNull { it.first } ?: 0.0) - (current.minOfOrNull { it.first } ?: 0.0),
+                    (current.maxOfOrNull { it.second } ?: 0.0) - (current.minOfOrNull { it.second } ?: 0.0)))
                 val scale = minOf(width, height) * 0.65 / extent
-                val centerEast = ((east.minOrNull() ?: 0.0) + (east.maxOrNull() ?: 0.0)) / 2
-                val centerNorth = ((north.minOrNull() ?: 0.0) + (north.maxOrNull() ?: 0.0)) / 2
-                fun px(i: Int) = (width / 2.0 + (east[i] - centerEast) * scale).toFloat()
-                fun py(i: Int) = (height / 2.0 - (north[i] - centerNorth) * scale).toFloat()
+                fun px(p: Pair<Double, Double>) = (width / 2.0 + p.first * scale).toFloat()
+                fun py(p: Pair<Double, Double>) = (height / 2.0 - p.second * scale).toFloat()
                 paint.style = Paint.Style.STROKE
                 paint.strokeCap = Paint.Cap.ROUND
                 paint.color = Color.rgb(143, 99, 57)
-                var offset = points.size + (if (liveLat.isFinite() && liveLon.isFinite()) 1 else 0)
                 for (j in 0 until previousRoutes.length()) {
                     val trip = previousRoutes.optJSONObject(j) ?: continue
                     val saved = trip.optJSONArray("route") ?: continue
-                    val count = (0 until saved.length()).count { k ->
-                        val c = saved.optJSONArray(k)
-                        c != null && c.optDouble(0, Double.NaN).isFinite() && c.optDouble(1, Double.NaN).isFinite()
+                    val historyPoints = mutableListOf<Pair<Double, Double>>()
+                    for (k in 0 until saved.length()) {
+                        val item = saved.optJSONArray(k) ?: continue
+                        val lat = item.optDouble(0, Double.NaN)
+                        val lon = item.optDouble(1, Double.NaN)
+                        if (lat.isFinite() && lon.isFinite()) historyPoints.add(lat to lon)
                     }
-                    if (count >= 2 && offset + count <= fixes.size) {
-                        val oldPath = Path().apply {
-                            moveTo(px(offset), py(offset))
-                            for (k in 1 until count) lineTo(px(offset + k), py(offset + k))
+                    val oldPath = Path()
+                    var begun = false
+                    for (point in historyPoints) {
+                        val p = local(point)
+                        if (kotlin.math.abs(p.first) > extent || kotlin.math.abs(p.second) > extent) {
+                            begun = false
+                            continue
                         }
-                        paint.strokeWidth = (trip.optDouble("cuttingWidth", 6.0).coerceIn(0.5, 30.0) * scale).toFloat().coerceAtLeast(2f)
-                        canvas.drawPath(oldPath, paint)
+                        if (!begun) { oldPath.moveTo(px(p), py(p)); begun = true }
+                        else oldPath.lineTo(px(p), py(p))
                     }
-                    offset += count
+                    paint.strokeWidth = (trip.optDouble("cuttingWidth", 6.0).coerceIn(0.5, 30.0) * scale).toFloat().coerceAtLeast(2f)
+                    canvas.drawPath(oldPath, paint)
                 }
-                if (points.size >= 2) {
-                    val routePath = Path().apply {
-                        moveTo(px(0), py(0))
-                        for (i in 1 until points.size) lineTo(px(i), py(i))
+                if (current.size >= 2) {
+                    val path = Path().apply {
+                        moveTo(px(current.first()), py(current.first()))
+                        for (i in 1 until current.size) lineTo(px(current[i]), py(current[i]))
                     }
-                    paint.style = Paint.Style.STROKE
+                    paint.color = Color.rgb(23, 144, 71)
                     paint.strokeWidth = 5f * resources.displayMetrics.density
-                    paint.strokeCap = Paint.Cap.ROUND
-                    paint.color = Color.rgb(143, 99, 57)
-                    canvas.drawPath(routePath, paint)
+                    canvas.drawPath(path, paint)
                 }
-                val last = if (liveLat.isFinite() && liveLon.isFinite()) points.size else if (points.isNotEmpty()) points.lastIndex else -1
-                val density = resources.displayMetrics.density
-                paint.style = Paint.Style.FILL
-                paint.color = Color.argb(75, 0, 108, 226)
-                if (last >= 0 && last < fixes.size) canvas.drawCircle(px(last), py(last), 16f * density, paint)
-                paint.color = Color.WHITE
-                if (last >= 0 && last < fixes.size) canvas.drawCircle(px(last), py(last), 10f * density, paint)
-                paint.color = Color.rgb(0, 108, 226)
-                if (last >= 0 && last < fixes.size) canvas.drawCircle(px(last), py(last), 7f * density, paint)
-                paint.textSize = 11f * density
-                paint.color = Color.rgb(8, 65, 40)
-                canvas.drawText("GPS route • field outline not aligned", 10f * density, 18f * density, paint)
+                if (hasLive) {
+                    val density = resources.displayMetrics.density
+                    paint.style = Paint.Style.FILL
+                    paint.color = Color.argb(70, 0, 108, 226)
+                    canvas.drawCircle(width / 2f, height / 2f, 16f * density, paint)
+                    paint.color = Color.WHITE
+                    canvas.drawCircle(width / 2f, height / 2f, 10f * density, paint)
+                    paint.color = Color.rgb(0, 108, 226)
+                    canvas.drawCircle(width / 2f, height / 2f, 7f * density, paint)
+                }
             }
+            paint.style = Paint.Style.FILL
+            paint.textSize = 11f * resources.displayMetrics.density
+            paint.color = Color.rgb(8, 65, 40)
+            canvas.drawText("GPS route • field outline not aligned", 10f * resources.displayMetrics.density, 18f * resources.displayMetrics.density, paint)
             canvas.restore()
             return
         }
