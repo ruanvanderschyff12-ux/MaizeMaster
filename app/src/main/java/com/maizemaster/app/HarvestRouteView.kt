@@ -120,6 +120,8 @@ class HarvestRouteView(context: Context) : View(context) {
         canvas.translate(width / 2f + panX, height / 2f + panY)
         canvas.scale(zoom, zoom)
         canvas.translate(-width / 2f, -height / 2f)
+        // Completed GPS passes are drawn in brown, even when no trip is active.
+        // Keep the live route green until the operator confirms the load.
         val points = mutableListOf<Pair<Double, Double>>()
         for (i in 0 until route.length()) {
             val item = route.optJSONArray(i) ?: continue
@@ -142,6 +144,17 @@ class HarvestRouteView(context: Context) : View(context) {
             val liveLon = livePosition.optDouble(1, Double.NaN)
             val fixes = points.toMutableList()
             if (liveLat.isFinite() && liveLon.isFinite()) fixes.add(liveLat to liveLon)
+            // Draw completed harvest passes in the same independent GPS projection.
+            // No surveyed boundary means the drawn field is illustrative only.
+            for (j in 0 until previousRoutes.length()) {
+                val saved = previousRoutes.optJSONObject(j)?.optJSONArray("route") ?: continue
+                for (k in 0 until saved.length()) {
+                    val coord = saved.optJSONArray(k) ?: continue
+                    val lat = coord.optDouble(0, Double.NaN)
+                    val lon = coord.optDouble(1, Double.NaN)
+                    if (lat.isFinite() && lon.isFinite()) fixes.add(lat to lon)
+                }
+            }
             if (fixes.isNotEmpty()) {
                 val centerLat = fixes.first().first
                 val centerLon = fixes.first().second
@@ -155,6 +168,27 @@ class HarvestRouteView(context: Context) : View(context) {
                 val centerNorth = ((north.minOrNull() ?: 0.0) + (north.maxOrNull() ?: 0.0)) / 2
                 fun px(i: Int) = (width / 2.0 + (east[i] - centerEast) * scale).toFloat()
                 fun py(i: Int) = (height / 2.0 - (north[i] - centerNorth) * scale).toFloat()
+                paint.style = Paint.Style.STROKE
+                paint.strokeCap = Paint.Cap.ROUND
+                paint.color = Color.rgb(143, 99, 57)
+                var offset = points.size + (if (liveLat.isFinite() && liveLon.isFinite()) 1 else 0)
+                for (j in 0 until previousRoutes.length()) {
+                    val trip = previousRoutes.optJSONObject(j) ?: continue
+                    val saved = trip.optJSONArray("route") ?: continue
+                    val count = (0 until saved.length()).count { k ->
+                        val c = saved.optJSONArray(k)
+                        c != null && c.optDouble(0, Double.NaN).isFinite() && c.optDouble(1, Double.NaN).isFinite()
+                    }
+                    if (count >= 2 && offset + count <= fixes.size) {
+                        val oldPath = Path().apply {
+                            moveTo(px(offset), py(offset))
+                            for (k in 1 until count) lineTo(px(offset + k), py(offset + k))
+                        }
+                        paint.strokeWidth = (trip.optDouble("cuttingWidth", 6.0).coerceIn(0.5, 30.0) * scale).toFloat().coerceAtLeast(2f)
+                        canvas.drawPath(oldPath, paint)
+                    }
+                    offset += count
+                }
                 if (points.size >= 2) {
                     val routePath = Path().apply {
                         moveTo(px(0), py(0))
@@ -166,15 +200,15 @@ class HarvestRouteView(context: Context) : View(context) {
                     paint.color = Color.rgb(143, 99, 57)
                     canvas.drawPath(routePath, paint)
                 }
-                val last = fixes.lastIndex
+                val last = if (liveLat.isFinite() && liveLon.isFinite()) points.size else if (points.isNotEmpty()) points.lastIndex else -1
                 val density = resources.displayMetrics.density
                 paint.style = Paint.Style.FILL
                 paint.color = Color.argb(75, 0, 108, 226)
-                canvas.drawCircle(px(last), py(last), 16f * density, paint)
+                if (last >= 0) canvas.drawCircle(px(last), py(last), 16f * density, paint)
                 paint.color = Color.WHITE
-                canvas.drawCircle(px(last), py(last), 10f * density, paint)
+                if (last >= 0) canvas.drawCircle(px(last), py(last), 10f * density, paint)
                 paint.color = Color.rgb(0, 108, 226)
-                canvas.drawCircle(px(last), py(last), 7f * density, paint)
+                if (last >= 0) canvas.drawCircle(px(last), py(last), 7f * density, paint)
                 paint.textSize = 11f * density
                 paint.color = Color.rgb(8, 65, 40)
                 canvas.drawText("GPS route • field outline not aligned", 10f * density, 18f * density, paint)
@@ -254,7 +288,7 @@ class HarvestRouteView(context: Context) : View(context) {
             }
         }
         val path = Path()
-        path.moveTo(x(0), y(0))
+        if (points.isNotEmpty()) path.moveTo(x(0), y(0))
         for (i in 1 until points.size) path.lineTo(x(i), y(i))
         paint.color = Color.rgb(143, 99, 57)
         paint.strokeWidth = (cuttingWidth * scale).toFloat().coerceAtLeast(1f)
@@ -277,7 +311,7 @@ class HarvestRouteView(context: Context) : View(context) {
         canvas.drawPath(path, paint)
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(10, 76, 46)
-        canvas.drawCircle(x(points.lastIndex), y(points.lastIndex), 8f * resources.displayMetrics.density, paint)
+        if (points.isNotEmpty()) canvas.drawCircle(x(points.lastIndex), y(points.lastIndex), 8f * resources.displayMetrics.density, paint)
         if (livePosition.length() >= 2) {
             val lat = livePosition.optDouble(0, Double.NaN)
             val lon = livePosition.optDouble(1, Double.NaN)
