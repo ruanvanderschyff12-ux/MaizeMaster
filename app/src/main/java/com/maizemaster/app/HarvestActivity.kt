@@ -36,7 +36,7 @@ class HarvestActivity : Activity() {
                 val field = gpsFields[id]
                 val width = trips.getFloat("${id}_cutting_width", 6f).toDouble()
                 val remaining = field?.let { (it.hectares() - it.harvestedHectares).coerceAtLeast(0.0) } ?: 0.0
-                val area = if (points >= 2) (meters * width / 10000.0).coerceAtMost(remaining) else 0.0
+                val area = if (field != null && points >= 2) gpsArea(field, width) else 0.0
                 val tonnes = area * (field?.expectedYield ?: 0.0)
                 label.text = String.format(Locale.US,
                     "📍 GPS: %.2f km • %d movements\n🌾 Live estimate: %.3f ha • %.2f t\nCutting width: %.1f m (adjust at trip end)",
@@ -58,6 +58,12 @@ class HarvestActivity : Activity() {
     override fun onPause() {
         refreshHandler.removeCallbacks(refreshGps)
         super.onPause()
+    }
+    private fun gpsArea(field: SavedField, width: Double): Double {
+        val remaining = (field.hectares() - field.harvestedHectares).coerceAtLeast(0.0)
+        val route = try { JSONArray(trips.getString("${field.id}_gps_route", "[]")) } catch (_: Exception) { JSONArray() }
+        val boundary = try { JSONArray(getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE).getString("${field.id}_boundary", "[]")) } catch (_: Exception) { JSONArray() }
+        return HarvestOverlapEstimator.estimate(route, history(field.id), width, boundary, remaining) ?: 0.0
     }
     private fun beginGps(id: String) {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -270,11 +276,11 @@ class HarvestActivity : Activity() {
         val guidance = label("GPS estimates are approximate; adjust before saving.", 13f)
         fun updateEstimate() {
             val w = width.text.toString().toDoubleOrNull() ?: 0.0
-            val area = if (points >= 2 && w in 0.1..30.0) (meters * w / 10000.0).coerceAtMost(remaining) else 0.0
+            val area = if (points >= 2 && w in 0.1..30.0) gpsArea(field, w) else 0.0
             hectares.setText(java.math.BigDecimal.valueOf(area).setScale(3, java.math.RoundingMode.DOWN).toPlainString())
             tons.setText(String.format(Locale.US, "%.2f", area * field.expectedYield))
             if (w in 0.1..30.0) trips.edit().putFloat("${field.id}_cutting_width", w.toFloat()).apply()
-            guidance.text = String.format(Locale.US, "GPS: %.2f km, %d movements. Area: %.3f ha. Check overlaps and measured load weight.", meters / 1000.0, points, area)
+            guidance.text = String.format(Locale.US, "GPS: %.2f km, %d movements. Unique cut estimate: %.3f ha. Check GPS accuracy and measured load weight.", meters / 1000.0, points, area)
         }
         width.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
