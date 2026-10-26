@@ -281,8 +281,8 @@ class HarvestRouteView(context: Context) : View(context) {
                 val lat = coord.optDouble(0, Double.NaN)
                 val lon = coord.optDouble(1, Double.NaN)
                 if (!lat.isFinite() || !lon.isFinite()) continue
-                val px = (width / 2.0 + (lon - lonCenter) * 111320.0 * factor * scale).toFloat()
-                val py = (height / 2.0 - (lat - latCenter) * 111320.0 * scale).toFloat()
+                val px = (width / 2.0 + ((lon - lonCenter) * 111320.0 * factor - centerEast) * scale).toFloat()
+                val py = (height / 2.0 - ((lat - latCenter) * 111320.0 - centerNorth) * scale).toFloat()
                 if (count++ == 0) oldPath.moveTo(px, py) else oldPath.lineTo(px, py)
             }
             if (count > 1) {
@@ -314,14 +314,14 @@ class HarvestRouteView(context: Context) : View(context) {
         canvas.drawPath(path, paint)
         paint.style = Paint.Style.FILL
         paint.color = Color.rgb(10, 76, 46)
-        if (points.isNotEmpty()) canvas.drawCircle(x(points.lastIndex), y(points.lastIndex), 8f * resources.displayMetrics.density, paint)
+        if (points.isNotEmpty()) canvas.drawCircle(x(points.lastIndex), y(points.lastIndex), 4f * resources.displayMetrics.density, paint)
         if (livePosition.length() >= 2) {
             val lat = livePosition.optDouble(0, Double.NaN)
             val lon = livePosition.optDouble(1, Double.NaN)
             if (lat.isFinite() && lon.isFinite()) {
                 paint.color = Color.rgb(0, 108, 226)
-                canvas.drawCircle((width / 2.0 + (lon - lonCenter) * 111320.0 * factor * scale).toFloat(),
-                    (height / 2.0 - (lat - latCenter) * 111320.0 * scale).toFloat(),
+                canvas.drawCircle((width / 2.0 + ((lon - lonCenter) * 111320.0 * factor - centerEast) * scale).toFloat(),
+                    (height / 2.0 - ((lat - latCenter) * 111320.0 - centerNorth) * scale).toFloat(),
                     9f * resources.displayMetrics.density, paint)
             }
         }
