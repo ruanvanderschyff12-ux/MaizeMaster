@@ -77,12 +77,14 @@ class HarvestGpsService : Service(), LocationListener {
         }
         try {
             manager = getSystemService(LOCATION_SERVICE) as LocationManager
+            preferences.edit().putString("${id}_gps_error", "Waiting for a location fix. Go outdoors and enable location.").apply()
             manager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this)
+            if (manager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) manager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 0f, this)
             // Seed the marker immediately when a recent accurate fix exists, even before movement.
             @Suppress("DEPRECATION")
-            val recent = manager?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val recent = listOfNotNull(manager?.getLastKnownLocation(LocationManager.GPS_PROVIDER), if (manager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) manager?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER) else null).maxByOrNull { it.time }
             if (recent != null && System.currentTimeMillis() - recent.time in 0..30000 &&
-                recent.hasAccuracy() && recent.accuracy <= 40f) {
+                recent.hasAccuracy() && recent.accuracy <= 100f) {
                 onLocationChanged(recent)
             }
             if (manager?.isProviderEnabled(LocationManager.GPS_PROVIDER) != true) {
@@ -97,12 +99,13 @@ class HarvestGpsService : Service(), LocationListener {
     override fun onLocationChanged(location: Location) {
         val id = fieldId ?: return
         if (preferences.getString("${id}_active", null) == null) { stopTracking(); return }
-        if (!location.hasAccuracy() || location.accuracy > 40f) {
+        if (!location.hasAccuracy() || location.accuracy > 100f) {
             preferences.edit().putString("${id}_gps_error", "Waiting for a stronger GPS signal. Try outdoors.").apply()
             return
         }
-        preferences.edit().remove("${id}_gps_error").putString("${id}_live_position", JSONArray().put(location.latitude).put(location.longitude).toString()).apply()
         if (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos > 15_000_000_000L) return
+        preferences.edit().remove("${id}_gps_error").putString("${id}_live_position", JSONArray().put(location.latitude).put(location.longitude).toString()).putLong("${id}_live_position_time", System.currentTimeMillis()).apply()
+        if (location.accuracy > 40f || location.provider != LocationManager.GPS_PROVIDER) return
         val last = previous
         previous = location
         if (last == null) {
