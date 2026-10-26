@@ -38,13 +38,16 @@ class HarvestActivity : Activity() {
                 val remaining = field?.let { (it.hectares() - it.harvestedHectares).coerceAtLeast(0.0) } ?: 0.0
                 val area = if (field != null && points >= 2) gpsArea(field, width) else 0.0
                 val tonnes = area * (field?.expectedYield ?: 0.0)
-                label.text = String.format(Locale.US,
+                val fixAge = System.currentTimeMillis() - trips.getLong("${id}_live_position_time", 0L)
+                val fixStatus = if (fixAge in 0..30000) "🟢 Live position received" else "🟠 Waiting for current location fix — go outdoors"
+                label.text = fixStatus + "\n" + String.format(Locale.US,
                     "📍 GPS: %.2f km • %d movements\n🌾 Live estimate: %.3f ha • %.2f t\nCutting width: %.1f m (adjust at trip end)",
                     meters / 1000.0, points, area, tonnes, width)
             }
             for ((id, view) in routeViews) {
                 view.route = try { JSONArray(trips.getString("${id}_gps_route", "[]")) } catch (_: Exception) { JSONArray() }
-                view.livePosition = try { JSONArray(trips.getString("${id}_live_position", "[]")) } catch (_: Exception) { JSONArray() }
+                val fixAge = System.currentTimeMillis() - trips.getLong("${id}_live_position_time", 0L)
+                view.livePosition = if (fixAge in 0..30000) try { JSONArray(trips.getString("${id}_live_position", "[]")) } catch (_: Exception) { JSONArray() } else JSONArray()
             }
             refreshHandler.postDelayed(this, 1000L)
         }
@@ -72,7 +75,7 @@ class HarvestActivity : Activity() {
             return
         }
         trips.edit().putString("${id}_active", stamp()).putFloat("${id}_cutting_width", 6f).putFloat("${id}_gps_meters", 0f)
-            .putInt("${id}_gps_points", 0).putString("${id}_gps_route", "[]").remove("${id}_live_position").remove("${id}_gps_error").apply()
+            .putInt("${id}_gps_points", 0).putString("${id}_gps_route", "[]").remove("${id}_live_position").remove("${id}_live_position_time").remove("${id}_gps_error").apply()
         try {
             startForegroundService(Intent(this, HarvestGpsService::class.java).apply {
                 action = HarvestGpsService.ACTION_START
