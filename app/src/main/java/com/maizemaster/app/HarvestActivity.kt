@@ -187,6 +187,54 @@ class HarvestActivity : Activity() {
                 field.remainingTons(), field.estimatedTons(), field.harvestedHectares, field.hectares()), 15f).apply {
                 setPadding(0, dp(12), 0, dp(14))
             })
+            if (entries.length() > 0) {
+                val suspicious = (0 until entries.length()).any { i ->
+                    val trip = entries.optJSONObject(i)
+                    trip != null && trip.optDouble("gpsMeters", 0.0) > field.hectares() * 10000.0 / 2.0
+                }
+                if (suspicious) {
+                    card.addView(label("⚠ Harvest percentage is based on saved trip entries, not the green/brown map. A previous long GPS trip may have overstated harvested hectares. Review and correct the total if needed.", 13f, true).apply {
+                        setTextColor(Color.rgb(160, 85, 25))
+                        setPadding(0, dp(8), 0, dp(8))
+                    })
+                    card.addView(Button(this).apply {
+                        text = "✎ Correct harvested area"
+                        isAllCaps = false
+                        setOnClickListener {
+                            val input = number("Actual hectares harvested").apply {
+                                setText(String.format(Locale.US, "%.4f", field.harvestedHectares))
+                            }
+                            AlertDialog.Builder(this@HarvestActivity)
+                                .setTitle("Correct harvested area — ${field.name}")
+                                .setMessage("Enter the actual total hectares harvested, not a trip amount. Existing trip history stays saved. Use a verified measurement; the map is only illustrative.")
+                                .setView(input)
+                                .setPositiveButton("Save correction", null)
+                                .setNegativeButton("Cancel", null)
+                                .create().also { dialog ->
+                                    dialog.setOnShowListener {
+                                        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                                            val area = input.text.toString().toDoubleOrNull()
+                                            if (area == null || !area.isFinite() || area < 0 || area > field.hectares()) {
+                                                Toast.makeText(this@HarvestActivity, "Enter an area between 0 and the field size.", Toast.LENGTH_LONG).show()
+                                            } else {
+                                                val old = field.harvestedHectares
+                                                field.harvestedHectares = area
+                                                if (storage.updateField(field)) {
+                                                    dialog.dismiss()
+                                                    render()
+                                                } else {
+                                                    field.harvestedHectares = old
+                                                    Toast.makeText(this@HarvestActivity, "Could not save correction.", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        }
+                                    }
+                                    dialog.show()
+                                }
+                        }
+                    })
+                }
+            }
             card.addView(label(if (active != null) "🚜 Trip started: $active" else "No active harvest trip", 14f))
             card.addView(Button(this).apply {
                 isAllCaps = false
