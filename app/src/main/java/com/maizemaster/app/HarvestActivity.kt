@@ -267,6 +267,19 @@ class HarvestActivity : Activity() {
                     gpsBoundary = try { JSONArray(getSharedPreferences("maizemaster_boundaries", MODE_PRIVATE).getString("${field.id}_boundary", "[]")) } catch (_: Exception) { JSONArray() }
                     previousRoutes = history(field.id)
                 }
+                val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                controls.addView(Button(this).apply {
+                    text = "🌽 View Field"
+                    isAllCaps = false
+                    setOnClickListener { map.followLocation = false }
+                }, LinearLayout.LayoutParams(0, dp(48), 1f))
+                controls.addView(Button(this).apply {
+                    text = "📍 Follow Me"
+                    isAllCaps = false
+                    setOnClickListener { map.followLocation = true }
+                }, LinearLayout.LayoutParams(0, dp(48), 1f))
+                card.addView(controls)
+                card.addView(label("Pinch to zoom • Drag to move • View Field resets the map", 12f))
                 routeViews[field.id] = map
                 card.addView(map, LinearLayout.LayoutParams(-1, dp(230)).apply {
                     topMargin = dp(8)
