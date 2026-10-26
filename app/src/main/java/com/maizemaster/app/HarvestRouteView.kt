@@ -216,15 +216,25 @@ class HarvestRouteView(context: Context) : View(context) {
         val north = points.map { (it.first - latCenter) * 111320.0 }
         val boundaryEast = boundaryPoints.map { (it.second - lonCenter) * 111320.0 * factor }
         val boundaryNorth = boundaryPoints.map { (it.first - latCenter) * 111320.0 }
-        val extent = max(20.0, max((boundaryEast.maxOrNull() ?: 0.0) - (boundaryEast.minOrNull() ?: 0.0),
-            (boundaryNorth.maxOrNull() ?: 0.0) - (boundaryNorth.minOrNull() ?: 0.0)))
+        val liveLat = livePosition.optDouble(0, Double.NaN)
+        val liveLon = livePosition.optDouble(1, Double.NaN)
+        val hasLive = liveLat.isFinite() && liveLon.isFinite()
+        val liveEast = if (hasLive) (liveLon - lonCenter) * 111320.0 * factor else 0.0
+        val liveNorth = if (hasLive) (liveLat - latCenter) * 111320.0 else 0.0
+        val west = minOf(boundaryEast.minOrNull() ?: 0.0, if (hasLive) liveEast else Double.POSITIVE_INFINITY)
+        val eastLimit = maxOf(boundaryEast.maxOrNull() ?: 0.0, if (hasLive) liveEast else Double.NEGATIVE_INFINITY)
+        val south = minOf(boundaryNorth.minOrNull() ?: 0.0, if (hasLive) liveNorth else Double.POSITIVE_INFINITY)
+        val northLimit = maxOf(boundaryNorth.maxOrNull() ?: 0.0, if (hasLive) liveNorth else Double.NEGATIVE_INFINITY)
+        val centerEast = (west + eastLimit) / 2.0
+        val centerNorth = (south + northLimit) / 2.0
+        val extent = max(20.0, max(eastLimit - west, northLimit - south))
         val scale = (minOf(width, height) * 0.8) / extent
-        fun x(i: Int) = (width / 2.0 + east[i] * scale).toFloat()
-        fun y(i: Int) = (height / 2.0 - north[i] * scale).toFloat()
+        fun x(i: Int) = (width / 2.0 + (east[i] - centerEast) * scale).toFloat()
+        fun y(i: Int) = (height / 2.0 - (north[i] - centerNorth) * scale).toFloat()
         val gpsOutline = Path().apply {
             for (i in boundaryPoints.indices) {
-                val px = (width / 2.0 + boundaryEast[i] * scale).toFloat()
-                val py = (height / 2.0 - boundaryNorth[i] * scale).toFloat()
+                val px = (width / 2.0 + (boundaryEast[i] - centerEast) * scale).toFloat()
+                val py = (height / 2.0 - (boundaryNorth[i] - centerNorth) * scale).toFloat()
                 if (i == 0) moveTo(px, py) else lineTo(px, py)
             }
             close()
@@ -235,8 +245,8 @@ class HarvestRouteView(context: Context) : View(context) {
                 val lat = livePosition.optDouble(0, Double.NaN)
                 val lon = livePosition.optDouble(1, Double.NaN)
                 if (lat.isFinite() && lon.isFinite()) {
-                    val px = (width / 2.0 + (lon - lonCenter) * 111320.0 * factor * scale).toFloat()
-                    val py = (height / 2.0 - (lat - latCenter) * 111320.0 * scale).toFloat()
+                    val px = (width / 2.0 + ((lon - lonCenter) * 111320.0 * factor - centerEast) * scale).toFloat()
+                    val py = (height / 2.0 - ((lat - latCenter) * 111320.0 - centerNorth) * scale).toFloat()
                     paint.style = Paint.Style.FILL
                     paint.color = Color.rgb(0, 108, 226)
                     canvas.drawCircle(px, py, 9f * resources.displayMetrics.density, paint)
