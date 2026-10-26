@@ -10,6 +10,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.SystemClock
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -101,6 +102,7 @@ class HarvestGpsService : Service(), LocationListener {
             return
         }
         preferences.edit().remove("${id}_gps_error").putString("${id}_live_position", JSONArray().put(location.latitude).put(location.longitude).toString()).apply()
+        if (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos > 15_000_000_000L) return
         val last = previous
         previous = location
         if (last == null) {
@@ -108,9 +110,9 @@ class HarvestGpsService : Service(), LocationListener {
             return
         }
         val seconds = (location.elapsedRealtimeNanos - last.elapsedRealtimeNanos) / 1e9
-        if (seconds <= 0 || seconds > 90) return
+        if (seconds <= 0 || seconds > 15) return
         val meters = last.distanceTo(location).toDouble()
-        if (meters < 3.0 || meters > 30.0 * seconds) return
+        if (meters < 3.0 || meters > 8.0 * seconds) return
         saveRoutePoint(id, location)
         val current = preferences.getFloat("${id}_gps_meters", 0f)
         preferences.edit()
