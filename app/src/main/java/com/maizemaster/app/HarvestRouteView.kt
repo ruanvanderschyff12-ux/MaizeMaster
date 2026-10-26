@@ -144,7 +144,8 @@ class HarvestRouteView(context: Context) : View(context) {
             val liveLon = livePosition.optDouble(1, Double.NaN)
             val fixes = points.toMutableList()
             if (liveLat.isFinite() && liveLon.isFinite()) fixes.add(liveLat to liveLon)
-            // Draw completed harvest passes in the same independent GPS projection.
+            // Keep the view centred on the current trip, not old routes from other locations.
+            // Draw completed passes only if they fit near the current trip.
             // No surveyed boundary means the drawn field is illustrative only.
             for (j in 0 until previousRoutes.length()) {
                 val saved = previousRoutes.optJSONObject(j)?.optJSONArray("route") ?: continue
@@ -152,12 +153,12 @@ class HarvestRouteView(context: Context) : View(context) {
                     val coord = saved.optJSONArray(k) ?: continue
                     val lat = coord.optDouble(0, Double.NaN)
                     val lon = coord.optDouble(1, Double.NaN)
-                    if (lat.isFinite() && lon.isFinite()) fixes.add(lat to lon)
+                    if (lat.isFinite() && lon.isFinite() && fixes.isEmpty()) fixes.add(lat to lon)
                 }
             }
             if (fixes.isNotEmpty()) {
-                val centerLat = fixes.first().first
-                val centerLon = fixes.first().second
+                val centerLat = if (liveLat.isFinite()) liveLat else fixes.first().first
+                val centerLon = if (liveLon.isFinite()) liveLon else fixes.first().second
                 val factor = cos(Math.toRadians(centerLat)).coerceAtLeast(0.01)
                 val east = fixes.map { (it.second - centerLon) * 111320.0 * factor }
                 val north = fixes.map { (it.first - centerLat) * 111320.0 }
@@ -204,11 +205,11 @@ class HarvestRouteView(context: Context) : View(context) {
                 val density = resources.displayMetrics.density
                 paint.style = Paint.Style.FILL
                 paint.color = Color.argb(75, 0, 108, 226)
-                if (last >= 0) canvas.drawCircle(px(last), py(last), 16f * density, paint)
+                if (last >= 0 && last < fixes.size) canvas.drawCircle(px(last), py(last), 16f * density, paint)
                 paint.color = Color.WHITE
-                if (last >= 0) canvas.drawCircle(px(last), py(last), 10f * density, paint)
+                if (last >= 0 && last < fixes.size) canvas.drawCircle(px(last), py(last), 10f * density, paint)
                 paint.color = Color.rgb(0, 108, 226)
-                if (last >= 0) canvas.drawCircle(px(last), py(last), 7f * density, paint)
+                if (last >= 0 && last < fixes.size) canvas.drawCircle(px(last), py(last), 7f * density, paint)
                 paint.textSize = 11f * density
                 paint.color = Color.rgb(8, 65, 40)
                 canvas.drawText("GPS route • field outline not aligned", 10f * density, 18f * density, paint)
