@@ -107,15 +107,25 @@ class HarvestGpsService : Service(), LocationListener {
         preferences.edit().remove("${id}_gps_error").putString("${id}_live_position", JSONArray().put(location.latitude).put(location.longitude).toString()).putLong("${id}_live_position_time", System.currentTimeMillis()).apply()
         if (location.accuracy > 40f || location.provider != LocationManager.GPS_PROVIDER) return
         val last = previous
-        previous = location
         if (last == null) {
+            previous = location
             saveRoutePoint(id, location)
             return
         }
         val seconds = (location.elapsedRealtimeNanos - last.elapsedRealtimeNanos) / 1e9
-        if (seconds <= 0 || seconds > 15) return
+        if (seconds <= 0) return
+        if (seconds > 15) {
+            // A long signal gap starts a fresh segment, never a harvested swath.
+            previous = location
+            return
+        }
         val meters = last.distanceTo(location).toDouble()
-        if (meters < 3.0 || meters > 8.0 * seconds) return
+        if (meters < 3.0) return
+        if (meters > 8.0 * seconds) {
+            // Reject a GPS jump without poisoning the last accepted baseline.
+            return
+        }
+        previous = location
         saveRoutePoint(id, location)
         val current = preferences.getFloat("${id}_gps_meters", 0f)
         preferences.edit()
