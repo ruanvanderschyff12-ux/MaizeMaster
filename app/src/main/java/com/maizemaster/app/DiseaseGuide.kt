@@ -279,18 +279,8 @@ object DiseaseGuide {
             )
         }
 
-        addText(
-            "🌽 Maize Disease Identification",
-            22f,
-            true
-        )
-
-        addText(
-            "Tap a problem to view symptoms, " +
-                "weather conditions, possible " +
-                "damage and real reference photos.",
-            15f
-        )
+        layout.addView(MaizeUi.header(activity, "CROP HEALTH GUIDE", "Pests & Diseases",
+            "Browse symptoms, field conditions and reference photos."))
 
         var previousCategory = ""
 

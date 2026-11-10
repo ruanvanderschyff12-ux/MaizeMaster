@@ -45,7 +45,8 @@ class GrowthActivity : Activity() {
         val body = column().apply { setPadding(dp(16), dp(20), dp(16), dp(24)) }
         scroll.addView(body)
         setContentView(scroll)
-        body.addView(text("🌱 Maize growth stages", 24f, true))
+        body.addView(MaizeUi.header(this, "CROP DEVELOPMENT", "Growth Stages",
+            "Open a field to view its current stage and update field observations."))
         body.addView(text("Automatic estimates refresh whenever this screen opens. Weather history downloads in the background; reopen this screen after a moment to see updates. Actual stages depend on temperature, moisture and maize variety.", 13f).apply {
             setPadding(0, dp(8), 0, dp(16))
         })

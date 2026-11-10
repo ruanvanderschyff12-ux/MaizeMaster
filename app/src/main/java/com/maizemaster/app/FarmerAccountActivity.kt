@@ -11,6 +11,7 @@ class FarmerAccountActivity : Activity() {
     private val auth by lazy { FirebaseAuth.getInstance() }
     private lateinit var layout: LinearLayout
     private lateinit var status: TextView
+    private lateinit var automaticSync: Switch
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,7 +23,8 @@ class FarmerAccountActivity : Activity() {
         scroll.addView(layout)
         setContentView(scroll)
         status = TextView(this).apply { textSize = 17f }
-        layout.addView(TextView(this).apply { text = "🌽 Farmer Account"; textSize = 26f })
+        layout.addView(MaizeUi.header(this, "ACCOUNT & SYNC", "Farmer Account",
+            "Sign in and sync saved field edits across your phones."))
         layout.addView(status)
         val email = EditText(this).apply {
             hint = "Email address"
@@ -86,6 +88,18 @@ class FarmerAccountActivity : Activity() {
                 }
             }
         })
+        layout.addView(TextView(this).apply {
+            text = "Automatic sync shares this phone’s saved fields with the signed-in account. It runs when you return to Home and every minute while Home stays open."
+        })
+        automaticSync = Switch(this).apply {
+            text = "Automatically sync fields on Home"
+            minHeight = MaizeUi.dp(this@FarmerAccountActivity, 48)
+            setOnClickListener {
+                val uid = auth.currentUser?.uid ?: return@setOnClickListener
+                FieldCloudSync.setAutomaticEnabled(this@FarmerAccountActivity, uid, isChecked)
+            }
+        }
+        layout.addView(automaticSync)
         layout.addView(Button(this).apply {
             text = "Sync fields now (safe merge)"
             setOnClickListener {
@@ -106,13 +120,13 @@ class FarmerAccountActivity : Activity() {
             setOnClickListener {
                 AlertDialog.Builder(this@FarmerAccountActivity)
                     .setTitle("Sign out?")
-                    .setMessage("Your locally saved fields will stay on this phone. Cloud syncing requires pressing Sync fields now.")
+                    .setMessage("Your saved fields will stay on this phone. Field sync pauses while you are signed out.")
                     .setPositiveButton("Sign out") { _, _ -> auth.signOut(); refresh() }
                     .setNegativeButton("Cancel", null).show()
             }
         })
         layout.addView(TextView(this).apply {
-            text = "Cloud sync is manual for now. Use Sync fields now on each phone. Conflicts are kept as separate copies; no fields are intentionally deleted."
+            text = "Use Sync fields now any time you want to sync immediately. Offline edits stay on your phone until the next online sync. Conflicting edits are kept as copies. Field deletions are local."
         })
         refresh()
     }
@@ -120,5 +134,7 @@ class FarmerAccountActivity : Activity() {
     private fun refresh() {
         val user = auth.currentUser
         status.text = if (user == null) "Not signed in" else "Signed in: ${user.email ?: "Farmer"}"
+        automaticSync.isEnabled = user != null
+        automaticSync.isChecked = user != null && FieldCloudSync.isAutomaticEnabled(this, user.uid)
     }
 }
