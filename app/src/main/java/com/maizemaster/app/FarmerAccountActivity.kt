@@ -22,7 +22,8 @@ class FarmerAccountActivity : Activity() {
         scroll.addView(layout)
         setContentView(scroll)
         status = TextView(this).apply { textSize = 17f }
-        layout.addView(TextView(this).apply { text = "🌽 Farmer Account"; textSize = 26f })
+        layout.addView(MaizeUi.header(this, "ACCOUNT & SYNC", "Farmer Account",
+            "Sign in and sync saved field edits across your phones."))
         layout.addView(status)
         val email = EditText(this).apply {
             hint = "Email address"

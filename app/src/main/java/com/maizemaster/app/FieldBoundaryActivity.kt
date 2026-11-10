@@ -29,10 +29,8 @@ class FieldBoundaryActivity : Activity(), LocationListener {
             setPadding(32, 40, 32, 32)
         }
         status = TextView(this).apply { textSize = 17f }
-        layout.addView(TextView(this).apply {
-            text = "Record GPS Field Boundary"
-            textSize = 24f
-        })
+        layout.addView(MaizeUi.header(this, "FIELD MAPPING", "Measure a Field",
+            "Record the outside edge with GPS to estimate the field area."))
         layout.addView(status)
         val nameInput = EditText(this).apply { hint = "Field name (optional)" }
         if (fieldId.isBlank()) layout.addView(nameInput)
@@ -50,13 +48,16 @@ class FieldBoundaryActivity : Activity(), LocationListener {
             text = "Cancel recording"
             setOnClickListener { stopRecording(); finish() }
         })
-        setContentView(layout)
+        setContentView(android.widget.ScrollView(this).apply { addView(layout) })
         status.text = "Walk or drive around the outside edge of your field, then return to the starting point. GPS should be enabled outdoors."
     }
 
     private fun startRecording() {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 801)
+            requestPermissions(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                801
+            )
             return
         }
         points = JSONArray()

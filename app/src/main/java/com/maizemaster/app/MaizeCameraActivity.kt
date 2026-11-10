@@ -12,6 +12,7 @@ import android.net.Uri
 import android.graphics.Rect
 import android.os.Bundle
 import android.provider.MediaStore
+import android.text.InputType
 import android.util.Base64
 import android.widget.*
 import androidx.core.content.FileProvider
@@ -21,6 +22,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Locale
 
 class MaizeCameraActivity : Activity() {
     private lateinit var preview: ImageView
@@ -41,11 +43,12 @@ class MaizeCameraActivity : Activity() {
         super.onCreate(savedInstanceState)
         gradingMode = intent.getBooleanExtra("gradingMode", false)
         pendingGradingPhoto = savedInstanceState?.getString("pendingGradingPhoto")?.let { File(cacheDir, it) }
-        val green = Color.rgb(18, 96, 51)
+        val green = MaizeUi.forest
+        val padding = MaizeUi.dp(this, 16)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 28)
-            setBackgroundColor(Color.rgb(245, 250, 246))
+            setPadding(padding, padding, padding, padding)
+            setBackgroundColor(MaizeUi.page)
         }
         fun heading(value: String, size: Float): TextView = TextView(this).apply {
             text = value
@@ -53,14 +56,16 @@ class MaizeCameraActivity : Activity() {
             setTextColor(green)
             setPadding(0, 10, 0, 16)
         }
-        root.addView(heading(if (gradingMode) "🌽 MaizeMate Grain Photo Assessment" else "🌽 MaizeMate Crop Scanner", 25f))
-        root.addView(heading(if (gradingMode) {
-            "Mix a small sample and spread the kernels in one layer on a plain surface. Take a sharp photo straight from above in good light. One photo is enough. You can add up to three photos of other portions from the same sample."
+        root.addView(if (gradingMode) {
+            MaizeUi.header(this, "GRAIN QUALITY", "Photo grade estimate",
+                "Spread a small sample in one layer on a plain surface. Take a sharp photo from above in good light. You can add up to three more photos of the same sample.")
         } else {
-            "Photograph maize plants, leaves, cobs or kernels. Analysis is advisory."
-        }, 14f))
+            MaizeUi.header(this, "CROP HEALTH", "AI Crop Scanner",
+                "Use clear photos of maize plants, leaves, cobs or kernels for a visual assessment.")
+        })
         preview = ImageView(this).apply {
-            setBackgroundColor(Color.rgb(225, 238, 225))
+            background = MaizeUi.surface(this@MaizeCameraActivity, Color.rgb(228, 241, 230))
+            clipToOutline = true
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Selected maize photo preview"
         }
@@ -73,8 +78,7 @@ class MaizeCameraActivity : Activity() {
             setOnClickListener { analyzePhoto() }
         }
         farmerDescription = EditText(this).apply {
-            hint = if (gradingMode) "Sample weight, visible defects or storage conditions (optional)"
-                else "Describe symptoms, when they started, and where you noticed them (optional)"
+            hint = "Describe symptoms, when they started, and where you noticed them (optional)"
             minLines = 2
             maxLines = 4
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
@@ -108,6 +112,7 @@ class MaizeCameraActivity : Activity() {
             root.addView(heading("📋 AI assessment", 19f))
             root.addView(results)
         }
+        MaizeUi.primary(analyzeButton)
         root.addView(Button(this).apply {
             text = if (gradingMode) "📷 Photograph kernels" else "📷 Take maize photo"
             setOnClickListener {
@@ -125,12 +130,16 @@ class MaizeCameraActivity : Activity() {
         if (gradingMode) {
             analyzeButton.text = "🌽 Estimate grade"
             root.addView(analyzeButton)
+            results.textSize = 24f
+            results.setTypeface(null, android.graphics.Typeface.BOLD)
             root.addView(results)
+            val resetMeasurements = addOptionalMeasurements(root)
             root.addView(Button(this).apply {
                 text = "Start new sample"
                 setOnClickListener {
                     if (analyzing) return@setOnClickListener
                     gradingPhotos.clear()
+                    resetMeasurements()
                     preview.setImageDrawable(null)
                     results.text = ""
                     status.text = "Choose a photo to begin."
@@ -145,6 +154,70 @@ class MaizeCameraActivity : Activity() {
         val pageScroll = ScrollView(this).apply { isFillViewport = true }
         pageScroll.addView(root)
         setContentView(pageScroll)
+    }
+
+    private fun addOptionalMeasurements(root: LinearLayout): () -> Unit {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = MaizeUi.surface(this@MaizeCameraActivity)
+            val padding = MaizeUi.dp(this@MaizeCameraActivity, 14)
+            setPadding(padding, padding, padding, padding)
+            visibility = android.view.View.GONE
+        }
+        panel.addView(TextView(this).apply {
+            text = "Record measurements if you have them. The photo estimate uses the kernels in the image."
+        })
+        fun weightField(label: String) = EditText(this).apply {
+            hint = label
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            panel.addView(this)
+        }
+        val sample = weightField("Sample weight (g)")
+        val underSieve = weightField("Material below the sieve (g)")
+        val summary = TextView(this).apply { textSize = 15f }
+        panel.addView(Button(this).apply {
+            text = "Review measurements"
+            setOnClickListener {
+                val sampleText = sample.text.toString().trim()
+                val belowText = underSieve.text.toString().trim()
+                val total = sampleText.replace(',', '.').toDoubleOrNull()
+                val below = belowText.replace(',', '.').toDoubleOrNull()
+                sample.error = if (sampleText.isNotEmpty() && (total == null || !total.isFinite() || total <= 0)) {
+                    "Enter a sample weight above zero."
+                } else null
+                underSieve.error = when {
+                    belowText.isNotEmpty() && (below == null || !below.isFinite() || below < 0) ->
+                        "Enter a weight of zero or more."
+                    total != null && below != null && below > total ->
+                        "This weight exceeds the sample weight."
+                    else -> null
+                }
+                summary.text = when {
+                    sample.error != null || underSieve.error != null -> ""
+                    total != null && below != null -> String.format(Locale.getDefault(), "%.2f%% of the sample passed through the sieve.", below / total * 100)
+                    total != null -> String.format(Locale.getDefault(), "Sample weight · %.1f g", total)
+                    below != null -> String.format(Locale.getDefault(), "Material below the sieve · %.1f g", below)
+                    else -> ""
+                }
+            }
+        })
+        panel.addView(summary)
+        root.addView(Button(this).apply {
+            text = "Add optional measurements"
+            setOnClickListener {
+                val show = panel.visibility != android.view.View.VISIBLE
+                panel.visibility = if (show) android.view.View.VISIBLE else android.view.View.GONE
+                text = if (show) "Hide optional measurements" else "Add optional measurements"
+            }
+        })
+        root.addView(panel)
+        return {
+            sample.text.clear()
+            underSieve.text.clear()
+            sample.error = null
+            underSieve.error = null
+            summary.text = ""
+        }
     }
 
     private fun openCamera() {
@@ -318,7 +391,7 @@ class MaizeCameraActivity : Activity() {
                     if (code !in 200..299) throw IllegalStateException(json.optString("error", "Service unavailable ($code)"))
                     val assessment = json.optJSONObject("assessment")
                     val formatted = if (wasGradingMode) {
-                        val label = assessment?.optString("suspectedCondition").orEmpty().ifBlank { json.optString("reply") }.trim()
+                        val label = assessment?.optString("suspectedCondition").orEmpty().ifBlank { json.optString("reply") }.trim().trimStart('*', '_', '#', ' ')
                         val grade = Regex("(?i)^(?:AI[- ]?)?(?:estimated |visual )?grade ([1-3])\\b")
                             .find(label)?.groupValues?.get(1)
                         when {

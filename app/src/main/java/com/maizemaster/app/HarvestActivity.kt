@@ -163,10 +163,8 @@ class HarvestActivity : Activity() {
         }
         scroll.addView(body)
         setContentView(scroll)
-        body.addView(label("🚜 Harvest command centre", 25f, true))
-        body.addView(label("Track every load, monitor tonnes and see what's left to harvest.", 14f).apply {
-            setPadding(0, dp(6), 0, dp(18))
-        })
+        body.addView(MaizeUi.header(this, "FIELD OPERATIONS", "GPS Harvesting",
+            "Track each pass, record loads and see what is left to harvest."))
         val fields = storage.loadFields()
         if (fields.isEmpty()) body.addView(label("Save a field in My Fields to start tracking harvest trips."))
         val totalHarvested = fields.sumOf { it.harvestedTons }

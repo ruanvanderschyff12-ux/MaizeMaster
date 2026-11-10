@@ -21,8 +21,8 @@ class YieldEstimatorActivity : Activity() {
         val scroll = ScrollView(this)
         scroll.addView(root)
         setContentView(scroll)
-        root.addView(TextView(this).apply { text = "🌽 Yield Estimator"; textSize = 25f; setTextColor(Color.rgb(21, 83, 48)) })
-        root.addView(TextView(this).apply { text = "Select a saved field and enter expected tons per hectare. Estimates are predictions, not guaranteed yields."; textSize = 15f })
+        root.addView(MaizeUi.header(this, "HARVEST PLANNING", "Yield Estimator",
+            "Select a saved field and enter the expected tonnes per hectare."))
         val fields = storage.loadFields()
         if (fields.isEmpty()) {
             root.addView(TextView(this).apply { text = "No saved fields yet. Create a field in Field Designer first."; textSize = 17f })
