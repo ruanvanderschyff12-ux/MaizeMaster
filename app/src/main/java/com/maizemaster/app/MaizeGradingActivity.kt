@@ -35,7 +35,7 @@ class MaizeGradingActivity : Activity() {
             }
         }
         root.addView(label("🌽 Maize Grain Grading", 25f))
-        root.addView(label("Enter sample weight and material passing through the sieve, then photograph defective kernels retained above the sieve. AI grading is provisional.", 14f))
+        root.addView(label("Record sample weight and sieve measurements here. For a separate visual estimate, split one representative sample into four portions and photograph each portion.", 14f))
         val sample = weightField("Total sample weight (g)")
         val below = weightField("Material passing through sieve (g)")
         root.addView(label("Record the sieve specification used and follow the applicable grading standard.", 13f))
@@ -53,7 +53,7 @@ class MaizeGradingActivity : Activity() {
                 } else {
                     val pctLower = lower / total * 100
                     result.text = String.format(Locale.US,
-"Sample: %.1f g\nMaterial below sieve: %.2f%%\n\nSieve: %s\n\nPhotograph the retained defective kernels to request an AI-estimated visual grade. Official grade: NOT DETERMINED.",
+"Sample: %.1f g\nMaterial below sieve: %.2f%%\n\nSieve: %s\n\nUse the four-photo assessment for a combined visual estimate. Official grade: NOT DETERMINED.",
                         total, pctLower,
                         sieve.text.toString().ifBlank { "Not specified" })
                 }
@@ -61,7 +61,7 @@ class MaizeGradingActivity : Activity() {
         })
         root.addView(result)
         root.addView(Button(this).apply {
-            text = "📷 Photograph defects — AI estimate Grade 1 / 2 / 3"
+            text = "📷 Assess four portions of one sample"
             setOnClickListener {
                 startActivity(Intent(this@MaizeGradingActivity, MaizeCameraActivity::class.java).putExtra("gradingMode", true))
             }

@@ -149,13 +149,15 @@ class HarvestRouteView(context: Context) : View(context) {
         canvas.translate(-width / 2f, -height / 2f)
         // Completed GPS passes are drawn in brown, even when no trip is active.
         // Keep the live route green until the operator confirms the load.
-        val points = mutableListOf<Pair<Double, Double>>()
-        for (i in 0 until route.length()) {
-            val item = route.optJSONArray(i) ?: continue
-            val lat = item.optDouble(0, Double.NaN)
-            val lon = item.optDouble(1, Double.NaN)
-            if (lat.isFinite() && lon.isFinite()) points.add(lat to lon)
-        }
+        fun coordinates(data: JSONArray): List<Pair<Double, Double>> =
+            (0 until data.length()).mapNotNull { index ->
+                val point = data.optJSONArray(index) ?: return@mapNotNull null
+                val lat = point.optDouble(0, Double.NaN)
+                val lon = point.optDouble(1, Double.NaN)
+                if (lat.isFinite() && lon.isFinite()) lat to lon else null
+            }
+
+        val points = coordinates(route)
         val boundaryPoints = mutableListOf<Pair<Double, Double>>()
         for (i in 0 until gpsBoundary.length()) {
             val item = gpsBoundary.optJSONArray(i) ?: continue
@@ -168,7 +170,22 @@ class HarvestRouteView(context: Context) : View(context) {
             val liveLat = livePosition.optDouble(0, Double.NaN)
             val liveLon = livePosition.optDouble(1, Double.NaN)
             val hasLive = liveLat.isFinite() && liveLon.isFinite()
-            val anchor = if (hasLive) Pair(liveLat, liveLon) else points.lastOrNull()
+            val savedPoints = if (!hasLive && points.isEmpty()) {
+                (0 until previousRoutes.length()).flatMap { index ->
+                    val saved = previousRoutes.optJSONObject(index)?.optJSONArray("route")
+                    if (saved == null) emptyList() else coordinates(saved)
+                }
+            } else emptyList()
+            val anchor = when {
+                hasLive -> liveLat to liveLon
+                points.isNotEmpty() -> points.last()
+                savedPoints.isNotEmpty() -> {
+                    val lat = (savedPoints.minOf { it.first } + savedPoints.maxOf { it.first }) / 2
+                    val lon = (savedPoints.minOf { it.second } + savedPoints.maxOf { it.second }) / 2
+                    lat to lon
+                }
+                else -> null
+            }
             if (anchor != null) {
                 val factor = cos(Math.toRadians(anchor.first)).coerceAtLeast(0.01)
                 fun local(p: Pair<Double, Double>) = Pair(
@@ -176,9 +193,10 @@ class HarvestRouteView(context: Context) : View(context) {
                     (p.first - anchor.first) * 111320.0)
                 // Only current route determines zoom; distant old routes cannot hide the blue dot.
                 val current = points.map(::local)
+                val fitted = if (savedPoints.isEmpty()) current else savedPoints.map(::local)
                 val extent = max(40.0, max(
-                    (current.maxOfOrNull { it.first } ?: 0.0) - (current.minOfOrNull { it.first } ?: 0.0),
-                    (current.maxOfOrNull { it.second } ?: 0.0) - (current.minOfOrNull { it.second } ?: 0.0)))
+                    (fitted.maxOfOrNull { it.first } ?: 0.0) - (fitted.minOfOrNull { it.first } ?: 0.0),
+                    (fitted.maxOfOrNull { it.second } ?: 0.0) - (fitted.minOfOrNull { it.second } ?: 0.0)))
                 val scale = minOf(width, height) * 0.65 / extent
                 fun px(p: Pair<Double, Double>) = (width / 2.0 + p.first * scale).toFloat()
                 fun py(p: Pair<Double, Double>) = (height / 2.0 - p.second * scale).toFloat()
@@ -188,13 +206,7 @@ class HarvestRouteView(context: Context) : View(context) {
                 for (j in 0 until previousRoutes.length()) {
                     val trip = previousRoutes.optJSONObject(j) ?: continue
                     val saved = trip.optJSONArray("route") ?: continue
-                    val historyPoints = mutableListOf<Pair<Double, Double>>()
-                    for (k in 0 until saved.length()) {
-                        val item = saved.optJSONArray(k) ?: continue
-                        val lat = item.optDouble(0, Double.NaN)
-                        val lon = item.optDouble(1, Double.NaN)
-                        if (lat.isFinite() && lon.isFinite()) historyPoints.add(lat to lon)
-                    }
+                    val historyPoints = coordinates(saved)
                     val oldPath = Path()
                     var begun = false
                     for (point in historyPoints) {
