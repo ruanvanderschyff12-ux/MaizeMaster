@@ -112,7 +112,7 @@ class FarmerAccountActivity : Activity() {
             }
         })
         layout.addView(TextView(this).apply {
-            text = "Cloud sync is manual for now. Use Sync fields now on each phone. Conflicts are kept as separate copies; no fields are intentionally deleted."
+            text = "Use Sync fields now on each phone to send and receive saved field edits. Offline edits stay on your phone until you sync online. If both phones edit the same field, your local edit is kept as a conflict copy. Field deletions are local."
         })
         refresh()
     }
