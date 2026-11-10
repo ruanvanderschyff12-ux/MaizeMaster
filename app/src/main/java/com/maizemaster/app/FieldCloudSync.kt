@@ -51,6 +51,7 @@ class FieldCloudSync(context: Context) {
                 return@addOnSuccessListener
             }
             val merged = local.loadFields()
+            val locallyDeletedIds = local.locallyDeletedFieldIds()
             val remoteById = mutableMapOf<String, SavedField>()
             val rawById = snapshot.documents.associate { it.id to (it.get("payload") as? String) }
             for ((id, raw) in rawById) {
@@ -66,6 +67,7 @@ class FieldCloudSync(context: Context) {
             for ((id, remote) in remoteById) {
                 val current = localById[id]
                 if (current == null) {
+                    if (id in locallyDeletedIds) continue
                     merged.add(remote)
                     recovered++
                     continue
@@ -156,7 +158,17 @@ class FieldCloudSync(context: Context) {
         }
     }
 
-    private companion object {
-        val syncRunning = AtomicBoolean()
+    companion object {
+        private val syncRunning = AtomicBoolean()
+
+        private fun settings(context: Context) =
+            context.getSharedPreferences("maizemaster_auto_field_sync", Context.MODE_PRIVATE)
+
+        fun isAutomaticEnabled(context: Context, uid: String): Boolean =
+            settings(context).getBoolean(uid, false)
+
+        fun setAutomaticEnabled(context: Context, uid: String, enabled: Boolean) {
+            settings(context).edit().putBoolean(uid, enabled).apply()
+        }
     }
 }

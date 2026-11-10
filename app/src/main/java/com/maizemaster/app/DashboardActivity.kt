@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.widget.*
 import java.util.Locale
@@ -19,6 +21,19 @@ class DashboardActivity : Activity() {
     private lateinit var fieldArea: LinearLayout
     private lateinit var summary: TextView
     private lateinit var accountStatus: TextView
+    private val syncHandler = Handler(Looper.getMainLooper())
+    private var homeVisible = false
+    private val automaticSync = object : Runnable {
+        override fun run() {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            if (!homeVisible || !FieldCloudSync.isAutomaticEnabled(this@DashboardActivity, uid)) return
+            FieldCloudSync(applicationContext).sync {
+                if (homeVisible && FirebaseAuth.getInstance().currentUser?.uid == uid) refresh()
+            }
+            syncHandler.postDelayed(this, 60_000L)
+        }
+    }
+
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density + .5f).toInt()
     private fun shape(color: Int, radius: Int = 15) = GradientDrawable().apply {
@@ -174,12 +189,25 @@ class DashboardActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        homeVisible = true
         if (::summary.isInitialized) refresh()
         if (::accountStatus.isInitialized) {
             val user = FirebaseAuth.getInstance().currentUser
-            accountStatus.text = if (user == null) "Not signed in — sign in or register to prepare for cloud syncing." else "Signed in: ${user.email ?: "Farmer"} — tap Manage Farmer Account to sync fields."
+            accountStatus.text = when {
+                user == null -> "Sign in to sync saved fields across phones."
+                FieldCloudSync.isAutomaticEnabled(this, user.uid) -> "Signed in: ${user.email ?: "Farmer"} · Automatic sync on Home"
+                else -> "Signed in: ${user.email ?: "Farmer"} · Manual field sync"
+            }
         }
+        syncHandler.removeCallbacks(automaticSync)
+        syncHandler.post(automaticSync)
         WeatherAutoSync.refresh(this)
+    }
+
+    override fun onPause() {
+        homeVisible = false
+        syncHandler.removeCallbacks(automaticSync)
+        super.onPause()
     }
 
     private fun refresh() {
