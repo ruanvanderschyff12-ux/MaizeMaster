@@ -5,6 +5,9 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Base64
@@ -22,9 +25,8 @@ class MaizeCameraActivity : Activity() {
     private lateinit var results: TextView
     private lateinit var farmerDescription: EditText
     private var photo: Bitmap? = null
-    private var detailedMode = false
-    private var insectMode = false
-    private var diseaseMode = false
+    private val gradingPhotos = mutableListOf<Bitmap>()
+    private var analyzing = false
     private var gradingMode = false
     private val cameraRequest = 4101
     private val galleryRequest = 4102
@@ -46,14 +48,18 @@ class MaizeCameraActivity : Activity() {
             setPadding(0, 10, 0, 16)
         }
         root.addView(heading(if (gradingMode) "🌽 MaizeMate Grain Photo Assessment" else "🌽 MaizeMate Crop Scanner", 25f))
-        root.addView(heading("Photograph maize plants, leaves, cobs or kernels. Analysis is advisory, not a laboratory diagnosis or official grain grade.", 14f))
+        root.addView(heading(if (gradingMode) {
+            "Mix one representative sample, divide it into four portions, and spread each portion in a single layer. Add one clear photo per portion. You will receive one visual estimate."
+        } else {
+            "Photograph maize plants, leaves, cobs or kernels. Analysis is advisory."
+        }, 14f))
         preview = ImageView(this).apply {
             setBackgroundColor(Color.rgb(225, 238, 225))
             scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Selected maize photo preview"
         }
         root.addView(preview, LinearLayout.LayoutParams(-1, (190 * resources.displayMetrics.density).toInt()))
-        status = heading("Choose a photo to begin.", 14f)
+        status = heading(if (gradingMode) "0 of 4 portions photographed." else "Choose a photo to begin.", 14f)
         root.addView(status)
         analyzeButton = Button(this).apply {
             text = "🌽 Analyse photo online"
@@ -61,7 +67,8 @@ class MaizeCameraActivity : Activity() {
             setOnClickListener { analyzePhoto() }
         }
         farmerDescription = EditText(this).apply {
-            hint = "Describe symptoms, when they started, and where you noticed them (optional)"
+            hint = if (gradingMode) "Sample weight, visible defects or storage conditions (optional)"
+                else "Describe symptoms, when they started, and where you noticed them (optional)"
             minLines = 2
             maxLines = 4
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
@@ -72,29 +79,32 @@ class MaizeCameraActivity : Activity() {
         if (gradingMode) analyzeButton.text = "🌽 Estimate visual grade (1 / 2 / 3)"
         root.addView(Button(this).apply {
             text = "🔬 Deeper analysis (experimental)"
-            setOnClickListener { detailedMode = true; analyzePhoto() }
+            setOnClickListener { analyzePhoto(detailed = true) }
         })
-        root.addView(Button(this).apply {
-            text = "🐛 Identify grain insect (close-up)"
-            setOnClickListener { insectMode = true; detailedMode = true; analyzePhoto() }
-        })
-        root.addView(heading("For insect identification, photograph the insect close up, plus damaged kernels. Add its size, colour, location and any holes or grain dust in the description.", 13f))
-        root.addView(Button(this).apply {
-            text = "🍃 Check maize disease (experimental)"
-            setOnClickListener { diseaseMode = true; detailedMode = true; analyzePhoto() }
-        })
-        root.addView(Button(this).apply {
-            text = "🌽 Open separate Grain Grading page"
-            setOnClickListener { startActivity(Intent(this@MaizeCameraActivity, MaizeGradingActivity::class.java)) }
-        })
-        root.addView(heading("For disease checks, photograph affected and healthy leaves and describe crop age and symptoms. For grain quality, photograph a representative kernel sample; a photo cannot measure moisture or establish an official grade.", 13f))
+        if (!gradingMode) {
+            root.addView(Button(this).apply {
+                text = "🐛 Identify grain insect (close-up)"
+                setOnClickListener { analyzePhoto(detailed = true, insect = true) }
+            })
+            root.addView(heading("For insect identification, photograph the insect close up, plus damaged kernels. Add its size, colour, location and any holes or grain dust in the description.", 13f))
+            root.addView(Button(this).apply {
+                text = "🍃 Check maize disease (experimental)"
+                setOnClickListener { analyzePhoto(detailed = true, disease = true) }
+            })
+            root.addView(Button(this).apply {
+                text = "🌽 Open separate Grain Grading page"
+                setOnClickListener { startActivity(Intent(this@MaizeCameraActivity, MaizeGradingActivity::class.java)) }
+            })
+            root.addView(heading("For disease checks, photograph affected and healthy leaves and describe crop age and symptoms. For grain quality, photograph a representative kernel sample; a photo cannot measure moisture or establish an official grade.", 13f))
+        }
         results = heading("", 16f)
         results.setTextColor(Color.rgb(25, 45, 31))
         root.addView(heading("📋 AI assessment", 19f))
         root.addView(results)
         root.addView(Button(this).apply {
-            text = "📷 Take maize photo"
+            text = if (gradingMode) "📷 Photograph next portion" else "📷 Take maize photo"
             setOnClickListener {
+                if (!canSelectPhoto()) return@setOnClickListener
                 try { startActivityForResult(Intent(MediaStore.ACTION_IMAGE_CAPTURE), cameraRequest) }
                 catch (_: Exception) { status.text = "No camera app available." }
             }
@@ -102,11 +112,23 @@ class MaizeCameraActivity : Activity() {
         root.addView(Button(this).apply {
             text = "🖼 Choose existing photo"
             setOnClickListener {
+                if (!canSelectPhoto()) return@setOnClickListener
                 startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*" }, galleryRequest)
             }
         })
+        if (gradingMode) root.addView(Button(this).apply {
+            text = "Start new four-photo sample"
+            setOnClickListener {
+                if (analyzing) return@setOnClickListener
+                gradingPhotos.clear()
+                preview.setImageDrawable(null)
+                results.text = ""
+                status.text = "0 of 4 portions photographed."
+                analyzeButton.isEnabled = false
+            }
+        })
         root.addView(Button(this).apply {
-            text = "← Back to dashboard"
+            text = "← Back"
             setOnClickListener { finish() }
         })
         val pageScroll = ScrollView(this).apply { isFillViewport = true }
@@ -117,47 +139,88 @@ class MaizeCameraActivity : Activity() {
     @Deprecated("Uses Android activity result callback for compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK || data == null) return
+        if (resultCode != RESULT_OK || data == null || !canSelectPhoto()) return
         try {
             val bitmap = when (requestCode) {
                 cameraRequest -> data.extras?.get("data") as? Bitmap
                 galleryRequest -> data.data?.let { uri ->
-                    contentResolver.openInputStream(uri)?.use { stream -> BitmapFactory.decodeStream(stream) }
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                    val options = BitmapFactory.Options().apply {
+                        inSampleSize = 1
+                        while (maxOf(bounds.outWidth, bounds.outHeight) / inSampleSize > 1600) inSampleSize *= 2
+                    }
+                    contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
                 }
                 else -> null
             }
             if (bitmap != null) {
-                photo = bitmap
-                preview.setImageBitmap(bitmap)
-                analyzeButton.isEnabled = true
+                if (gradingMode) gradingPhotos.add(bitmap) else photo = bitmap
+                preview.setImageBitmap(if (gradingMode) gradingSheet(gradingPhotos) else bitmap)
+                analyzeButton.isEnabled = !gradingMode || gradingPhotos.size == 4
                 results.text = ""
-                status.text = "Photo ready. Tap Analyse photo online."
+                status.text = if (gradingMode) "${gradingPhotos.size} of 4 portions photographed."
+                    else "Photo ready. Tap Analyse photo online."
             } else status.text = "Could not read this photo."
         } catch (_: Exception) { status.text = "Unable to display photo. Try another image." }
     }
 
-    private fun analyzePhoto() {
-        val bitmap = photo ?: return
-        val wasInsectMode = insectMode
-        val wasDiseaseMode = diseaseMode
+    private fun canSelectPhoto(): Boolean {
+        if (analyzing) return false
+        if (gradingMode && gradingPhotos.size == 4) {
+            status.text = "All four portions are ready. Analyse them or start a new sample."
+            return false
+        }
+        return true
+    }
+
+    private fun gradingSheet(photos: List<Bitmap>): Bitmap {
+        val tileSize = 500
+        val sheet = Bitmap.createBitmap(tileSize * 2, tileSize * 2, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(sheet)
+        canvas.drawColor(Color.WHITE)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        photos.forEachIndexed { index, bitmap ->
+            val available = tileSize - 16
+            val scale = available.toFloat() / maxOf(bitmap.width, bitmap.height)
+            val width = (bitmap.width * scale).toInt().coerceAtLeast(1)
+            val height = (bitmap.height * scale).toInt().coerceAtLeast(1)
+            val left = (index % 2) * tileSize + (tileSize - width) / 2
+            val top = (index / 2) * tileSize + (tileSize - height) / 2
+            canvas.drawBitmap(bitmap, null, Rect(left, top, left + width, top + height), paint)
+        }
+        return sheet
+    }
+
+    private fun analyzePhoto(detailed: Boolean = false, insect: Boolean = false, disease: Boolean = false) {
+        if (analyzing) return
+        if (gradingMode && gradingPhotos.size != 4) {
+            status.text = "Photograph all four portions before analysing."
+            return
+        }
+        val bitmap = if (gradingMode) gradingSheet(gradingPhotos) else photo ?: return
+        val wasInsectMode = insect
+        val wasDiseaseMode = disease
         val wasGradingMode = gradingMode
         val description = farmerDescription.text.toString().trim().take(700)
-        val insectInstructions = if (insectMode) "GRAIN INSECT IDENTIFICATION: Focus on visible insect morphology (snout, antennae, wings, body shape, colour, size), holes in maize kernels and powdery dust. Compare cautiously with maize weevil (Sitophilus zeamais), larger grain borer (Prostephanus truncatus), lesser grain borer (Rhyzopertha dominica), grain moths and other stored-grain insects. Give a likely common and scientific name only if visual evidence supports it; otherwise say unidentified insect, list distinguishing features and request a sharper close-up. Distinguish insects from damage alone. Provide practical non-chemical storage inspection and hygiene steps. Do not recommend unsafe insecticides or claim certainty." else ""
-        val diseaseInstructions = if (diseaseMode) "MAIZE DISEASE ASSESSMENT: Describe observed lesion shape, colour, pattern and affected tissue. Compare cautiously with northern corn leaf blight, grey leaf spot, common rust, southern rust, maize streak virus, nutrient deficiency, drought or herbicide injury as appropriate. State one most likely cause only if evidence supports it, list alternatives and specific differentiating signs. Avoid definitive diagnosis; request field history and expert or laboratory confirmation where needed." else ""
-        val gradingInstructions = if (gradingMode) "GRAIN QUALITY PHOTO SCREENING ONLY: Assess the image and give a cautious preliminary Grade 1, Grade 2, or Grade 3 suggestion ONLY when sufficient visible evidence supports a rough visual tier; otherwise say Cannot estimate. Put the suggested grade at the start of suspectedCondition as AI-estimated Grade 1 / AI-estimated Grade 2 / AI-estimated Grade 3 / Cannot estimate, followed by brief reasons. Do not claim this is a verified South African regulated grade; real grade thresholds require measured defects and moisture. Start the suspectedCondition with a clear tentative VISUAL QUALITY CATEGORY: Appears clean / Visible defects / Possible serious defects / Unable to assess. This is not a regulatory grade and must not use official grade labels. Describe visible broken kernels, discolouration, insect holes, mould-like growth and foreign material, with uncertainty. Never claim a South African official maize grade or numerical defect percentages from an uncalibrated photo. Explain that representative sampling, moisture meter readings, defect measurements, applicable South African grading standards and potentially mycotoxin testing are required. Do not declare visibly mouldy grain safe to eat or feed." else ""
+        val insectInstructions = if (insect) "GRAIN INSECT IDENTIFICATION: Focus on visible insect morphology (snout, antennae, wings, body shape, colour, size), holes in maize kernels and powdery dust. Compare cautiously with maize weevil (Sitophilus zeamais), larger grain borer (Prostephanus truncatus), lesser grain borer (Rhyzopertha dominica), grain moths and other stored-grain insects. Give a likely common and scientific name only if visual evidence supports it; otherwise say unidentified insect, list distinguishing features and request a sharper close-up. Distinguish insects from damage alone. Provide practical non-chemical storage inspection and hygiene steps. Do not recommend unsafe insecticides or claim certainty." else ""
+        val diseaseInstructions = if (disease) "MAIZE DISEASE ASSESSMENT: Describe observed lesion shape, colour, pattern and affected tissue. Compare cautiously with northern corn leaf blight, grey leaf spot, common rust, southern rust, maize streak virus, nutrient deficiency, drought or herbicide injury as appropriate. State one most likely cause only if evidence supports it, list alternatives and specific differentiating signs. Avoid definitive diagnosis; request field history and expert or laboratory confirmation where needed." else ""
+        val gradingInstructions = if (gradingMode) "GRAIN PHOTO SCREENING: This image contains a 2 by 2 grid of four representative portions from one maize sample. Inspect all four quadrants and give one combined visual assessment. Begin suspectedCondition with Visual Grade 1 estimate, Visual Grade 2 estimate, Visual Grade 3 estimate, or Cannot estimate. Use Cannot estimate when the four portions are unclear or the visible evidence is insufficient. Describe broken kernels, discolouration, insect damage, mould-like growth and foreign material. Never infer numerical defect percentages, moisture, food or feed safety, or official South African grade from the photos." else ""
         val combinedDescription = listOf(insectInstructions, diseaseInstructions, gradingInstructions, description).filter { it.isNotBlank() }.joinToString("\n").take(2400)
         val user = FirebaseAuth.getInstance().currentUser
         if (user == null) {
             status.text = "Sign in to MaizeMaster before using online analysis."
             return
         }
+        analyzing = true
         analyzeButton.isEnabled = false
-        status.text = "Analysing photo online…"
+        status.text = if (gradingMode) "Analysing all four portions…" else "Analysing photo online…"
         results.text = ""
         user.getIdToken(false).addOnCompleteListener { task ->
             val token = if (task.isSuccessful) task.result?.token else null
             if (token.isNullOrEmpty()) {
                 status.text = "Could not verify sign-in. Please sign in again."
+                analyzing = false
                 analyzeButton.isEnabled = true
                 return@addOnCompleteListener
             }
@@ -180,7 +243,7 @@ class MaizeCameraActivity : Activity() {
                         setRequestProperty("Content-Type", "application/json")
                         setRequestProperty("Authorization", "Bearer $token")
                     }
-                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg").put("detailed", detailedMode).put("description", combinedDescription)
+                    val payload = JSONObject().put("imageBase64", encoded).put("mimeType", "image/jpeg").put("detailed", detailed).put("description", combinedDescription)
                     conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                     val code = conn.responseCode
                     val stream = if (code in 200..299) conn.inputStream else conn.errorStream
@@ -206,13 +269,13 @@ class MaizeCameraActivity : Activity() {
                             "Confirm with a sharper close-up or an expert if uncertain.\n\n"
                         } else ""
                         val focusedSummary = when {
-                            wasDiseaseMode -> "🍃 Disease screening (tentative): ${assessment.optString("suspectedCondition", "Uncertain")}\\nEvidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\\n\\n"
-                            wasGradingMode -> "🌽 AI-ESTIMATED GRADE (PHOTO ONLY)\\n${assessment.optString("suspectedCondition", "Cannot estimate")}\\n\\nNOT AN OFFICIAL MAIZE GRADE. Moisture, measured defects, representative sampling and applicable standards are required.\\n\\n"
+                            wasDiseaseMode -> "🍃 Disease screening (tentative): ${assessment.optString("suspectedCondition", "Uncertain")}\nEvidence: ${assessment.optString("diagnosticEvidence", "Not provided")}\n\n"
+                            wasGradingMode -> "🌽 COMBINED VISUAL GRADE ESTIMATE\n${assessment.optString("suspectedCondition", "Cannot estimate")}\n\nNOT AN OFFICIAL MAIZE GRADE. Moisture, measured defects, representative sampling and applicable standards are required.\n\n"
                             else -> ""
                         }
-                        insectSummary + focusedSummary + "Subject: ${assessment.optString("subject")}\\n\\n" +
+                        insectSummary + focusedSummary + "Subject: ${assessment.optString("subject")}\n\n" +
                         "Observations:\n${lines("observations")}\n\n" +
-                        "🔎 Suspected disease / pest: ${assessment.optString("suspectedCondition", "Not identifiable from this photo")}\n\n" +
+                        "🔎 ${if (wasGradingMode) "Visual assessment" else "Suspected disease / pest"}: ${assessment.optString("suspectedCondition", "Not identifiable from this photo")}\n\n" +
                         "Supporting evidence: ${assessment.optString("diagnosticEvidence", "Insufficient visual evidence.")}\n\n" +
                         "Possible causes:\n${lines("possibleCauses")}\n\n" +
                         "Confidence: ${assessment.optString("confidence")}\n\n" +
@@ -223,16 +286,13 @@ class MaizeCameraActivity : Activity() {
                         results.text = formatted
                         status.text = "Analysis complete."
                         analyzeButton.isEnabled = true
-                        detailedMode = false
-                        insectMode = false
-                        diseaseMode = false
-                        gradingMode = false
+                        analyzing = false
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         status.text = "Analysis unavailable: ${e.message ?: "Please try again."}"
                         analyzeButton.isEnabled = true
-                        detailedMode = false
+                        analyzing = false
                     }
                 }
             }.start()
