@@ -19,9 +19,9 @@ import java.net.URL
  * A future secure backend can supply conversational AI without embedding API keys in the APK.
  */
 class MaizeAiActivity : Activity() {
-    private val dark = Color.rgb(12, 78, 49)
+    private val dark = MaizeUi.forest
     private val green = Color.rgb(28, 137, 57)
-    private val pale = Color.rgb(244, 248, 245)
+    private val pale = MaizeUi.page
     private val gold = Color.rgb(245, 189, 59)
     private lateinit var conversation: LinearLayout
     private lateinit var scroll: ScrollView

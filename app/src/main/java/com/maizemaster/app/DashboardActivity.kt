@@ -1,26 +1,39 @@
 package com.maizemaster.app
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
-import android.view.View
 import android.widget.*
 import java.util.Locale
 import com.google.firebase.auth.FirebaseAuth
 
 class DashboardActivity : Activity() {
-    private val dark = Color.rgb(8, 65, 40)
+    private val dark = MaizeUi.forest
     private val green = Color.rgb(28, 137, 57)
-    private val light = Color.rgb(246, 249, 246)
+    private val light = MaizeUi.page
     private val storage by lazy { FieldStorage(this) }
     private lateinit var fieldArea: LinearLayout
     private lateinit var summary: TextView
     private lateinit var accountStatus: TextView
+    private val syncHandler = Handler(Looper.getMainLooper())
+    private var homeVisible = false
+    private val automaticSync = object : Runnable {
+        override fun run() {
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+            if (!homeVisible || !FieldCloudSync.isAutomaticEnabled(this@DashboardActivity, uid)) return
+            FieldCloudSync(applicationContext).sync {
+                if (homeVisible && FirebaseAuth.getInstance().currentUser?.uid == uid) refresh()
+            }
+            syncHandler.postDelayed(this, 60_000L)
+        }
+    }
+
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density + .5f).toInt()
     private fun shape(color: Int, radius: Int = 15) = GradientDrawable().apply {
@@ -36,16 +49,15 @@ class DashboardActivity : Activity() {
         }
     private fun column() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
     private fun panel() = column().apply {
-        background = shape(Color.WHITE)
-        elevation = dp(3).toFloat()
+        background = MaizeUi.surface(this@DashboardActivity)
+        elevation = dp(1).toFloat()
         setPadding(dp(16), dp(15), dp(16), dp(15))
     }
     private fun button(s: String, action: () -> Unit) = Button(this).apply {
         text = s
         isAllCaps = false
         textSize = 14f
-        setTextColor(Color.WHITE)
-        background = shape(green, 13)
+        MaizeUi.primary(this)
         setOnClickListener { action() }
     }
     // Route each dashboard shortcut to its own field section.
@@ -55,50 +67,13 @@ class DashboardActivity : Activity() {
     private fun openHarvest() = startActivity(Intent(this, HarvestActivity::class.java))
     private fun openMaizeAi() = startActivity(Intent(this, MaizeAiActivity::class.java))
     private fun openKnowledge() = startActivity(Intent(this, KnowledgeActivity::class.java))
-    private fun unavailable(title: String) {
-        AlertDialog.Builder(this).setTitle(title)
-            .setMessage("This feature is being developed. Your current field management and weather tools are available now.")
-            .setPositiveButton("OK", null).show()
-    }
-    private fun showFeaturePage(title: String, content: String) {
-        val page = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            setBackgroundColor(light)
-        }
-        page.addView(label(title, 23f, true))
-        val scroller = ScrollView(this)
-        scroller.addView(label(content, 16f).apply {
-            setPadding(0, dp(18), 0, dp(18))
-        })
-        page.addView(scroller, LinearLayout.LayoutParams(-1, 0, 1f))
-        val dialog = AlertDialog.Builder(this).setView(page).create()
-        page.addView(button("Back to dashboard") { dialog.dismiss() })
-        dialog.show()
-        dialog.window?.setLayout(-1, -1)
-    }
-
-    private fun showGrowth() {
-        val fields = storage.loadFields()
-        val message = if (fields.isEmpty()) "Save a field first to track maize growth." else fields.joinToString("\n\n") { field ->
-            val growth = if (field.plantingDate.isNotBlank() && field.maturityDays > 0)
-                MaizeGrowthCalculator.calculate(field.plantingDate, field.maturityDays).stage
-            else "Set planting date and maturity days in My Fields"
-            "🌽 ${field.name}\nGrowth: $growth\nPlanted: ${field.plantingDate.ifBlank { "Not set" }}"
-        }
-        showFeaturePage("🌱 Maize Growth Stages", message)
-    }
-
-    private fun showKnowledge() {
-        showFeaturePage("📖 Maize Farming Knowledge", "PLANTING\nPlant in suitable soil moisture and temperature. Check seed depth, row spacing and plant population.\n\nGROWTH\nScout for uneven emergence, weeds, nutrient deficiencies and leaf damage.\n\nFLOWERING\nHeat and water stress during tasseling and silking can reduce kernel set.\n\nHARVEST\nCheck grain moisture and storage conditions before harvesting.\n\nThese are general guidelines; use local agronomic advice for your field.")
-    }
-
     private fun tile(icon: String, title: String, description: String, action: () -> Unit): LinearLayout =
         panel().apply {
-            minimumHeight = dp(116)
+            minimumHeight = dp(122)
+            isFocusable = true
             addView(label(icon, 27f))
             addView(label(title, 15f, true).apply { setPadding(0, dp(6), 0, dp(3)) })
-            addView(label(description, 11f, false, Color.DKGRAY))
+            addView(label(description, 13f, false, Color.DKGRAY))
             setOnClickListener { action() }
         }
 
@@ -126,13 +101,8 @@ class DashboardActivity : Activity() {
         }
         body.addView(content)
 
-        val weather = panel()
-        weather.addView(label("☀️  Weather & maize risks", 19f, true))
-        weather.addView(label("See your local forecast and how conditions can affect maize.", 13f).apply {
-            setPadding(0, dp(7), 0, dp(9))
-        })
-        weather.addView(button("View live weather  ›") { openWeather() })
-        content.addView(weather, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+        content.addView(MaizeUi.header(this, "FARM DASHBOARD", "MaizeMaster",
+            "Manage your fields from planting through harvest."))
 
         val field = panel().apply { background = shape(Color.rgb(226, 242, 226)) }
         field.addView(label("🌱  My Field", 21f, true))
@@ -142,42 +112,45 @@ class DashboardActivity : Activity() {
         field.addView(button("View My Fields  ›") { openFields() })
         content.addView(field, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(17) })
 
+        fun tools(title: String, items: List<Pair<Triple<String, String, String>, () -> Unit>>) {
+            content.addView(label(title, 20f, true).apply { setPadding(dp(3), dp(4), 0, dp(12)) })
+            for (pair in items.chunked(2)) {
+                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                pair.forEachIndexed { index, (item, action) ->
+                    row.addView(tile(item.first, item.second, item.third, action),
+                        LinearLayout.LayoutParams(0, -1, 1f).apply {
+                            if (index == 0) rightMargin = dp(6) else leftMargin = dp(6)
+                        })
+                }
+                content.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+            }
+        }
+
+        tools("Field management", listOf(
+            Triple("🗺️", "Field Designer", "Plan field shape and rows") to { openFields(1) },
+            Triple("🌱", "Planting Details", "Record planting and variety") to { openFields(2) },
+            Triple("📊", "Harvest Estimates", "Plan expected tonnage") to { openFields(3) },
+            Triple("🚜", "GPS Harvesting", "Track your harvest passes") to { openHarvest() },
+            Triple("🌿", "Growth Stages", "Follow crop development") to { openGrowth() },
+            Triple("🌤️", "Weather", "Check forecasts and risks") to { openWeather() },
+            Triple("🌽", "Yield Estimator", "Calculate expected yield") to { startActivity(Intent(this, YieldEstimatorActivity::class.java)) },
+            Triple("📍", "Measure a Field", "Walk or drive a GPS boundary") to { startActivity(Intent(this, FieldBoundaryActivity::class.java)) }
+        ))
+        tools("Grain and crop tools", listOf(
+            Triple("🌽", "Grain Grading", "Estimate quality from a photo") to { startActivity(Intent(this, MaizeGradingActivity::class.java)) },
+            Triple("📷", "AI Crop Scanner", "Check visible crop symptoms") to { startActivity(Intent(this, MaizeCameraActivity::class.java)) },
+            Triple("🤖", "MaizeMate", "Ask maize farming questions") to { openMaizeAi() },
+            Triple("🛡️", "Pests & Diseases", "Look up common crop risks") to { DiseaseGuide.show(this) }
+        ))
+
         val accountPanel = panel()
-        accountPanel.addView(label("🔐  Account & Cloud Sync", 19f, true))
-        accountStatus = label("Checking account...", 13f)
+        accountPanel.addView(label("Account & cloud sync", 19f, true))
+        accountStatus = label("Checking account...", 13f).apply { setPadding(0, dp(6), 0, dp(10)) }
         accountPanel.addView(accountStatus)
-        accountPanel.addView(button("Manage Farmer Account  ›") {
+        accountPanel.addView(button("Manage farmer account") {
             startActivity(Intent(this, FarmerAccountActivity::class.java))
         })
         content.addView(accountPanel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
-
-        content.addView(label("Explore MaizeMaster", 20f, true).apply {
-            setPadding(dp(3), 0, 0, dp(12))
-        })
-
-        val items = listOf(
-            Triple("🗺️", "Field Designer", "Design your field") to { openFields(1) },
-            Triple("🌤️", "Weather", "Forecast & risks") to { openWeather() },
-            Triple("🌱", "Growth Stages", "Follow crop growth") to { openGrowth() },
-            Triple("🌽", "Yield Estimator", "Estimate your harvest") to { startActivity(Intent(this, YieldEstimatorActivity::class.java)) },
-            Triple("🛡️", "Pests & Diseases", "Learn about crop risks") to { DiseaseGuide.show(this) },
-            Triple("🚜", "Harvest Tracker", "Record harvest progress") to { openHarvest() },
-            Triple("🤖", "MaizeMate", "Ask maize farming questions") to { openMaizeAi() },
-            Triple("📷", "AI Crop Scanner", "Photograph maize crops") to { startActivity(Intent(this, MaizeCameraActivity::class.java)) }
-        )
-        content.addView(button("🌽 Grain Grading — Photo Grade Estimate") { startActivity(Intent(this, MaizeGradingActivity::class.java)) })
-        for (i in 0 until (items.size + 1) / 2) {
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            for (j in 0 until 2) {
-                if (i * 2 + j >= items.size) continue
-                val item = items[i * 2 + j]
-                row.addView(tile(item.first.first, item.first.second, item.first.third, item.second),
-                    LinearLayout.LayoutParams(0, -2, 1f).apply {
-                        if (j == 0) rightMargin = dp(6) else leftMargin = dp(6)
-                    })
-            }
-            content.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
-        }
 
         fieldArea = column()
         content.addView(label("Saved Fields", 19f, true).apply { setPadding(0, dp(6), 0, dp(8)) })
@@ -193,8 +166,9 @@ class DashboardActivity : Activity() {
         val tabs = listOf(
             Triple("⌂", "Home", { scroll.smoothScrollTo(0, 0) }),
             Triple("🌱", "My Fields", { openFields() }),
-            Triple("☁", "Weather", { openWeather() }),
-            Triple("📖", "Knowledge", { showKnowledge() })
+            Triple("🚜", "Harvest", { openHarvest() }),
+            Triple("🌽", "Grading", { startActivity(Intent(this, MaizeGradingActivity::class.java)) }),
+            Triple("📖", "Knowledge", { openKnowledge() })
         )
         for ((symbol, name, action) in tabs) {
             val tab = column().apply {
@@ -203,6 +177,8 @@ class DashboardActivity : Activity() {
                 setPadding(dp(3), dp(5), dp(3), dp(5))
                 addView(label(symbol, 22f, false, Color.WHITE))
                 addView(label(name, 11f, false, Color.WHITE))
+                isFocusable = true
+                contentDescription = name
                 setOnClickListener { action() }
             }
             nav.addView(tab, LinearLayout.LayoutParams(0, dp(57), 1f))
@@ -213,12 +189,25 @@ class DashboardActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        homeVisible = true
         if (::summary.isInitialized) refresh()
         if (::accountStatus.isInitialized) {
             val user = FirebaseAuth.getInstance().currentUser
-            accountStatus.text = if (user == null) "Not signed in — sign in or register to prepare for cloud syncing." else "Signed in: ${user.email ?: "Farmer"} — tap Manage Farmer Account to sync fields."
+            accountStatus.text = when {
+                user == null -> "Sign in to sync saved fields across phones."
+                FieldCloudSync.isAutomaticEnabled(this, user.uid) -> "Signed in: ${user.email ?: "Farmer"} · Automatic sync on Home"
+                else -> "Signed in: ${user.email ?: "Farmer"} · Manual field sync"
+            }
         }
+        syncHandler.removeCallbacks(automaticSync)
+        syncHandler.post(automaticSync)
         WeatherAutoSync.refresh(this)
+    }
+
+    override fun onPause() {
+        homeVisible = false
+        syncHandler.removeCallbacks(automaticSync)
+        super.onPause()
     }
 
     private fun refresh() {

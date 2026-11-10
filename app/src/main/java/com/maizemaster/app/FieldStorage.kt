@@ -72,7 +72,12 @@ class FieldStorage(context: Context) {
         return fields
     }
 
-    fun saveFields(fields: List<SavedField>): Boolean {
+    fun saveFields(fields: List<SavedField>): Boolean = saveFields(fields, null)
+
+    fun locallyDeletedFieldIds(): Set<String> =
+        preferences.getStringSet("locally_deleted_field_ids", emptySet()).orEmpty().toSet()
+
+    private fun saveFields(fields: List<SavedField>, deletedIds: Set<String>?): Boolean {
         val array = JSONArray()
 
         for (field in fields) {
@@ -101,9 +106,9 @@ class FieldStorage(context: Context) {
             array.put(item)
         }
 
-        return preferences.edit()
-            .putString("saved_fields", array.toString())
-            .commit()
+        val edit = preferences.edit().putString("saved_fields", array.toString())
+        if (deletedIds != null) edit.putStringSet("locally_deleted_field_ids", deletedIds)
+        return edit.commit()
     }
 
     fun addField(field: SavedField): Boolean {
@@ -130,7 +135,7 @@ class FieldStorage(context: Context) {
             it.id == fieldId
         }
 
-        return removed && saveFields(fields)
+        return removed && saveFields(fields, locallyDeletedFieldIds() + fieldId)
     }
     companion object {
         fun fromJson(item: JSONObject): SavedField = SavedField(

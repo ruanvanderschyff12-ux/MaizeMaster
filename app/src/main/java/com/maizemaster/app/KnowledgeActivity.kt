@@ -2,19 +2,48 @@ package com.maizemaster.app
 
 import android.app.Activity
 import android.os.Bundle
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
 class KnowledgeActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val scroll = ScrollView(this)
-        val text = TextView(this).apply {
-            textSize = 17f
-            setPadding(28, 28, 28, 28)
-            text = "📖 Maize farming knowledge\n\nPLANTING\nCheck soil moisture, temperature, seed depth and spacing.\n\nVEGETATIVE GROWTH\nScout for weeds, pests, nutrient deficiency and leaf damage.\n\nFLOWERING\nHeat and water stress at tasseling and silking can reduce kernel set.\n\nGRAIN FILLING\nMonitor moisture, crop health and lodging.\n\nHARVEST\nCheck grain moisture before harvest and storage.\n\nThese are general guidelines; consult local agronomic advice."
+        val padding = MaizeUi.dp(this, 16)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, padding)
         }
-        scroll.addView(text)
-        setContentView(scroll)
+        content.addView(MaizeUi.header(this, "FIELD GUIDE", "Maize Knowledge",
+            "Practical reminders from planting to storage."))
+        val topics = listOf(
+            "Planting" to "Check soil moisture, temperature, seed depth and spacing.",
+            "Vegetative growth" to "Scout for weeds, pests, nutrient deficiency and leaf damage.",
+            "Flowering" to "Heat and water stress at tasseling and silking can reduce kernel set.",
+            "Grain filling" to "Monitor moisture, crop health and lodging.",
+            "Harvest and storage" to "Check grain moisture before harvest and storage."
+        )
+        for ((title, description) in topics) {
+            content.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                background = MaizeUi.surface(this@KnowledgeActivity)
+                setPadding(padding, padding, padding, padding)
+                addView(TextView(this@KnowledgeActivity).apply {
+                    text = title
+                    textSize = 17f
+                    setTextColor(MaizeUi.forest)
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                })
+                addView(TextView(this@KnowledgeActivity).apply {
+                    text = description
+                    textSize = 15f
+                    setPadding(0, MaizeUi.dp(this@KnowledgeActivity, 4), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = MaizeUi.dp(this@KnowledgeActivity, 10) })
+        }
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(MaizeUi.page)
+            addView(content)
+        })
     }
 }
