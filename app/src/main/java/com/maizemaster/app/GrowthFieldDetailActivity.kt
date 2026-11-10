@@ -35,7 +35,8 @@ class GrowthFieldDetailActivity : Activity() {
                 setPadding(0, dp(7), 0, dp(7))
             })
         }
-        label("🌽 " + field.name, 26f)
+        content.addView(MaizeUi.header(this, "FIELD GROWTH", field.name,
+            "View the estimated stage or record what you see in the field."))
         val valid = field.plantingDate.isNotBlank() && field.maturityDays > 0
         val estimate = if (valid) WeatherGrowthEstimator.calculate(this, field) else null
         val progress = estimate?.result?.progressPercent ?: 0

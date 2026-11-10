@@ -241,7 +241,8 @@ class MainActivity : Activity() {
         val pages = listOf(homePage, designerPage, plantingPage, estimatePage, fieldsPage)
         val pageNames = listOf("Home", "Field Designer", "Planting Details", "Harvest Estimate", "My Fields")
         val navigation = card()
-        navigation.addView(heading("🌽 MaizeMaster sections"))
+        navigation.addView(MaizeUi.header(this, "FIELD MANAGEMENT", "Manage your fields",
+            "Design fields, record planting details and plan your harvest."))
         val pageSelector = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity,
                 android.R.layout.simple_spinner_dropdown_item, pageNames)

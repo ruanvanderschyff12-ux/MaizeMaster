@@ -35,19 +35,28 @@ class HarvestActivity : Activity() {
                 val points = trips.getInt("${id}_gps_points", 0)
                 val field = gpsFields[id]
                 val width = trips.getFloat("${id}_cutting_width", 6f).toDouble()
-                val remaining = field?.let { (it.hectares() - it.harvestedHectares).coerceAtLeast(0.0) } ?: 0.0
                 val area = if (field != null && points >= 2) gpsArea(field, width) else 0.0
                 val tonnes = area * (field?.expectedYield ?: 0.0)
                 val fixAge = System.currentTimeMillis() - trips.getLong("${id}_live_position_time", 0L)
-                val fixStatus = if (fixAge in 0..30000) "🟢 Live position received" else "🟠 Waiting for current location fix — go outdoors"
+                val gpsError = trips.getString("${id}_gps_error", null)
+                val fixStatus = when {
+                    fixAge in 0..30000 -> "🟢 Live position received"
+                    gpsError != null -> "🟠 $gpsError"
+                    else -> "🟠 Waiting for current location fix — go outdoors"
+                }
                 label.text = fixStatus + "\n" + String.format(Locale.US,
                     "📍 GPS: %.2f km • %d movements\n🌾 Live estimate: %.3f ha • %.2f t\nCutting width: %.1f m (adjust at trip end)",
                     meters / 1000.0, points, area, tonnes, width)
             }
             for ((id, view) in routeViews) {
-                view.route = try { JSONArray(trips.getString("${id}_gps_route", "[]")) } catch (_: Exception) { JSONArray() }
+                val active = id in gpsLabels
+                view.route = if (active) {
+                    try { JSONArray(trips.getString("${id}_gps_route", "[]")) } catch (_: Exception) { JSONArray() }
+                } else JSONArray()
                 val fixAge = System.currentTimeMillis() - trips.getLong("${id}_live_position_time", 0L)
-                view.livePosition = if (fixAge in 0..30000) try { JSONArray(trips.getString("${id}_live_position", "[]")) } catch (_: Exception) { JSONArray() } else JSONArray()
+                view.livePosition = if (active && fixAge in 0..30000) {
+                    try { JSONArray(trips.getString("${id}_live_position", "[]")) } catch (_: Exception) { JSONArray() }
+                } else JSONArray()
             }
             refreshHandler.postDelayed(this, 1000L)
         }
@@ -55,6 +64,9 @@ class HarvestActivity : Activity() {
     override fun onResume() {
         super.onResume()
         render()
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            gpsLabels.keys.singleOrNull()?.let(::startGpsService)
+        }
         refreshHandler.removeCallbacks(refreshGps)
         refreshHandler.post(refreshGps)
     }
@@ -69,13 +81,24 @@ class HarvestActivity : Activity() {
         return HarvestOverlapEstimator.estimate(route, history(field.id), width, boundary, remaining) ?: 0.0
     }
     private fun beginGps(id: String) {
+        if (gpsLabels.isNotEmpty()) {
+            Toast.makeText(this, "Finish or cancel the active harvest trip first.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             pendingField = id
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 602)
+            requestPermissions(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                602
+            )
             return
         }
         trips.edit().putString("${id}_active", stamp()).putFloat("${id}_cutting_width", 6f).putFloat("${id}_gps_meters", 0f)
             .putInt("${id}_gps_points", 0).putString("${id}_gps_route", "[]").remove("${id}_live_position").remove("${id}_live_position_time").remove("${id}_gps_error").apply()
+        startGpsService(id)
+        render()
+    }
+    private fun startGpsService(id: String) {
         try {
             startForegroundService(Intent(this, HarvestGpsService::class.java).apply {
                 action = HarvestGpsService.ACTION_START
@@ -84,11 +107,11 @@ class HarvestActivity : Activity() {
         } catch (e: Exception) {
             trips.edit().putString("${id}_gps_error", "GPS service could not start: ${e.message}").apply()
         }
-        render()
     }
-    private fun stopGps() {
+    private fun stopGps(id: String) {
         startService(Intent(this, HarvestGpsService::class.java).apply {
             action = HarvestGpsService.ACTION_STOP
+            putExtra(HarvestGpsService.EXTRA_FIELD, id)
         })
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -96,7 +119,7 @@ class HarvestActivity : Activity() {
         if (requestCode == 602) {
             val id = pendingField
             pendingField = null
-            if (id != null && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginGps(id)
+            if (id != null && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) beginGps(id)
             else Toast.makeText(this, "Precise location is needed for GPS tracking.", Toast.LENGTH_LONG).show()
         }
     }
@@ -140,10 +163,8 @@ class HarvestActivity : Activity() {
         }
         scroll.addView(body)
         setContentView(scroll)
-        body.addView(label("🚜 Harvest command centre", 25f, true))
-        body.addView(label("Track every load, monitor tonnes and see what's left to harvest.", 14f).apply {
-            setPadding(0, dp(6), 0, dp(18))
-        })
+        body.addView(MaizeUi.header(this, "FIELD OPERATIONS", "GPS Harvesting",
+            "Track each pass, record loads and see what is left to harvest."))
         val fields = storage.loadFields()
         if (fields.isEmpty()) body.addView(label("Save a field in My Fields to start tracking harvest trips."))
         val totalHarvested = fields.sumOf { it.harvestedTons }
@@ -286,9 +307,6 @@ class HarvestActivity : Activity() {
                     bottomMargin = dp(12)
                 })
             }
-            if (active != null) trips.getString("${field.id}_gps_error", null)?.let {
-                card.addView(label("GPS warning: $it", 13f))
-            }
             card.addView(Button(this).apply {
                 isAllCaps = false
                 text = if (active == null) "▶ Start harvest trip" else "■ End trip and record load"
@@ -307,8 +325,13 @@ class HarvestActivity : Activity() {
                     AlertDialog.Builder(this@HarvestActivity)
                         .setMessage("Cancel this trip without adding any harvest?")
                         .setPositiveButton("Cancel trip") { _, _ ->
-                            stopGps()
-                            trips.edit().remove("${field.id}_active").apply()
+                            stopGps(field.id)
+                            trips.edit()
+                                .remove("${field.id}_active")
+                                .remove("${field.id}_gps_route")
+                                .remove("${field.id}_live_position")
+                                .remove("${field.id}_live_position_time")
+                                .apply()
                             render()
                         }.setNegativeButton("Keep trip", null).show()
                 }
@@ -378,7 +401,7 @@ class HarvestActivity : Activity() {
                         Toast.makeText(this, "Could not save harvest; trip remains active.", Toast.LENGTH_LONG).show()
                         return@setOnClickListener
                     }
-                    stopGps()
+                    stopGps(field.id)
                     val entries = history(field.id)
                     entries.put(JSONObject().apply {
                         put("start", started)
@@ -394,6 +417,9 @@ class HarvestActivity : Activity() {
                     trips.edit()
                         .putString("${field.id}_history", entries.toString())
                         .remove("${field.id}_active")
+                        .remove("${field.id}_gps_route")
+                        .remove("${field.id}_live_position")
+                        .remove("${field.id}_live_position_time")
                         .apply()
                     dialog.dismiss()
                     render()
