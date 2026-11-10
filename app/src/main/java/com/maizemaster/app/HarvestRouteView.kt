@@ -149,12 +149,12 @@ class HarvestRouteView(context: Context) : View(context) {
         canvas.translate(-width / 2f, -height / 2f)
         // Completed GPS passes are drawn in brown, even when no trip is active.
         // Keep the live route green until the operator confirms the load.
-        fun coordinates(data: JSONArray): List<Pair<Double, Double>> =
+        fun coordinates(data: JSONArray): List<Triple<Double, Double, Boolean>> =
             (0 until data.length()).mapNotNull { index ->
                 val point = data.optJSONArray(index) ?: return@mapNotNull null
                 val lat = point.optDouble(0, Double.NaN)
                 val lon = point.optDouble(1, Double.NaN)
-                if (lat.isFinite() && lon.isFinite()) lat to lon else null
+                if (lat.isFinite() && lon.isFinite()) Triple(lat, lon, point.optBoolean(2)) else null
             }
 
         val points = coordinates(route)
@@ -178,7 +178,7 @@ class HarvestRouteView(context: Context) : View(context) {
             } else emptyList()
             val anchor = when {
                 hasLive -> liveLat to liveLon
-                points.isNotEmpty() -> points.last()
+                points.isNotEmpty() -> points.last().let { it.first to it.second }
                 savedPoints.isNotEmpty() -> {
                     val lat = (savedPoints.minOf { it.first } + savedPoints.maxOf { it.first }) / 2
                     val lon = (savedPoints.minOf { it.second } + savedPoints.maxOf { it.second }) / 2
@@ -188,7 +188,7 @@ class HarvestRouteView(context: Context) : View(context) {
             }
             if (anchor != null) {
                 val factor = cos(Math.toRadians(anchor.first)).coerceAtLeast(0.01)
-                fun local(p: Pair<Double, Double>) = Pair(
+                fun local(p: Triple<Double, Double, Boolean>) = Pair(
                     (p.second - anchor.second) * 111320.0 * factor,
                     (p.first - anchor.first) * 111320.0)
                 // Only current route determines zoom; distant old routes cannot hide the blue dot.
@@ -215,7 +215,7 @@ class HarvestRouteView(context: Context) : View(context) {
                             begun = false
                             continue
                         }
-                        if (!begun) { oldPath.moveTo(px(p), py(p)); begun = true }
+                        if (!begun || point.third) { oldPath.moveTo(px(p), py(p)); begun = true }
                         else oldPath.lineTo(px(p), py(p))
                     }
                     paint.strokeWidth = (trip.optDouble("cuttingWidth", 6.0).coerceIn(0.5, 30.0) * scale).toFloat().coerceAtLeast(2f)
@@ -224,7 +224,10 @@ class HarvestRouteView(context: Context) : View(context) {
                 if (current.size >= 2) {
                     val path = Path().apply {
                         moveTo(px(current.first()), py(current.first()))
-                        for (i in 1 until current.size) lineTo(px(current[i]), py(current[i]))
+                        for (i in 1 until current.size) {
+                            if (points[i].third) moveTo(px(current[i]), py(current[i]))
+                            else lineTo(px(current[i]), py(current[i]))
+                        }
                     }
                     paint.color = Color.rgb(23, 144, 71)
                     paint.strokeWidth = 5f * resources.displayMetrics.density
@@ -279,32 +282,6 @@ class HarvestRouteView(context: Context) : View(context) {
             close()
         }
         drawMaizeField(canvas, gpsOutline)
-        if (points.isEmpty()) {
-            if (livePosition.length() >= 2) {
-                val lat = livePosition.optDouble(0, Double.NaN)
-                val lon = livePosition.optDouble(1, Double.NaN)
-                if (lat.isFinite() && lon.isFinite()) {
-                    val px = (width / 2.0 + ((lon - lonCenter) * 111320.0 * factor - centerEast) * scale).toFloat()
-                    val py = (height / 2.0 - ((lat - latCenter) * 111320.0 - centerNorth) * scale).toFloat()
-                    paint.style = Paint.Style.FILL
-                    paint.color = Color.rgb(0, 108, 226)
-                    canvas.drawCircle(px, py, 9f * resources.displayMetrics.density, paint)
-                }
-            }
-            canvas.restore()
-            return
-        }
-        val pad = 16f * resources.displayMetrics.density
-        val fit = minOf((width - 2f * pad) / fieldWidth.toFloat(),
-            (height - 2f * pad) / (if (fieldShape == "Circle") fieldWidth else fieldLength).toFloat())
-        val fieldW = fieldWidth.toFloat() * fit
-        val fieldH = (if (fieldShape == "Circle") fieldWidth else fieldLength).toFloat() * fit
-        val bounds = RectF((width - fieldW) / 2f, (height - fieldH) / 2f,
-            (width + fieldW) / 2f, (height + fieldH) / 2f)
-        val boundary = Path().apply {
-            if (fieldShape == "Oval" || fieldShape == "Circle") addOval(bounds, Path.Direction.CW)
-            else addRect(bounds, Path.Direction.CW)
-        }
         canvas.save()
         canvas.clipPath(gpsOutline)
         paint.style = Paint.Style.STROKE
@@ -322,7 +299,7 @@ class HarvestRouteView(context: Context) : View(context) {
                 if (!lat.isFinite() || !lon.isFinite()) continue
                 val px = (width / 2.0 + ((lon - lonCenter) * 111320.0 * factor - centerEast) * scale).toFloat()
                 val py = (height / 2.0 - ((lat - latCenter) * 111320.0 - centerNorth) * scale).toFloat()
-                if (count++ == 0) oldPath.moveTo(px, py) else oldPath.lineTo(px, py)
+                if (count++ == 0 || coord.optBoolean(2)) oldPath.moveTo(px, py) else oldPath.lineTo(px, py)
             }
             if (count > 1) {
                 paint.strokeWidth = (trip.optDouble("cuttingWidth", 6.0).coerceIn(0.5, 30.0) * scale).toFloat().coerceAtLeast(1f)
@@ -331,7 +308,9 @@ class HarvestRouteView(context: Context) : View(context) {
         }
         val path = Path()
         if (points.isNotEmpty()) path.moveTo(x(0), y(0))
-        for (i in 1 until points.size) path.lineTo(x(i), y(i))
+        for (i in 1 until points.size) {
+            if (points[i].third) path.moveTo(x(i), y(i)) else path.lineTo(x(i), y(i))
+        }
         paint.color = Color.rgb(143, 99, 57)
         paint.strokeWidth = (cuttingWidth * scale).toFloat().coerceAtLeast(1f)
         paint.style = Paint.Style.STROKE

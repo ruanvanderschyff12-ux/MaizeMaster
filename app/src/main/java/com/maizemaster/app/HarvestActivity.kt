@@ -64,6 +64,9 @@ class HarvestActivity : Activity() {
     override fun onResume() {
         super.onResume()
         render()
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            gpsLabels.keys.singleOrNull()?.let(::startGpsService)
+        }
         refreshHandler.removeCallbacks(refreshGps)
         refreshHandler.post(refreshGps)
     }
@@ -78,6 +81,10 @@ class HarvestActivity : Activity() {
         return HarvestOverlapEstimator.estimate(route, history(field.id), width, boundary, remaining) ?: 0.0
     }
     private fun beginGps(id: String) {
+        if (gpsLabels.isNotEmpty()) {
+            Toast.makeText(this, "Finish or cancel the active harvest trip first.", Toast.LENGTH_LONG).show()
+            return
+        }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             pendingField = id
             requestPermissions(
@@ -88,6 +95,10 @@ class HarvestActivity : Activity() {
         }
         trips.edit().putString("${id}_active", stamp()).putFloat("${id}_cutting_width", 6f).putFloat("${id}_gps_meters", 0f)
             .putInt("${id}_gps_points", 0).putString("${id}_gps_route", "[]").remove("${id}_live_position").remove("${id}_live_position_time").remove("${id}_gps_error").apply()
+        startGpsService(id)
+        render()
+    }
+    private fun startGpsService(id: String) {
         try {
             startForegroundService(Intent(this, HarvestGpsService::class.java).apply {
                 action = HarvestGpsService.ACTION_START
@@ -96,11 +107,11 @@ class HarvestActivity : Activity() {
         } catch (e: Exception) {
             trips.edit().putString("${id}_gps_error", "GPS service could not start: ${e.message}").apply()
         }
-        render()
     }
-    private fun stopGps() {
+    private fun stopGps(id: String) {
         startService(Intent(this, HarvestGpsService::class.java).apply {
             action = HarvestGpsService.ACTION_STOP
+            putExtra(HarvestGpsService.EXTRA_FIELD, id)
         })
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -316,7 +327,7 @@ class HarvestActivity : Activity() {
                     AlertDialog.Builder(this@HarvestActivity)
                         .setMessage("Cancel this trip without adding any harvest?")
                         .setPositiveButton("Cancel trip") { _, _ ->
-                            stopGps()
+                            stopGps(field.id)
                             trips.edit()
                                 .remove("${field.id}_active")
                                 .remove("${field.id}_gps_route")
@@ -392,7 +403,7 @@ class HarvestActivity : Activity() {
                         Toast.makeText(this, "Could not save harvest; trip remains active.", Toast.LENGTH_LONG).show()
                         return@setOnClickListener
                     }
-                    stopGps()
+                    stopGps(field.id)
                     val entries = history(field.id)
                     entries.put(JSONObject().apply {
                         put("start", started)
