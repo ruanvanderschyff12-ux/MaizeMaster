@@ -79,8 +79,6 @@ class DashboardActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = dark
-        window.navigationBarColor = dark
 
         val root = column().apply { setBackgroundColor(light) }
         val scroll = ScrollView(this).apply {
@@ -184,7 +182,7 @@ class DashboardActivity : Activity() {
             nav.addView(tab, LinearLayout.LayoutParams(0, dp(57), 1f))
         }
         root.addView(nav, LinearLayout.LayoutParams(-1, -2))
-        setContentView(root)
+        setMaizeContentView(root)
     }
 
     override fun onResume() {

@@ -48,7 +48,7 @@ class FieldBoundaryActivity : Activity(), LocationListener {
             text = "Cancel recording"
             setOnClickListener { stopRecording(); finish() }
         })
-        setContentView(android.widget.ScrollView(this).apply { addView(layout) })
+        setMaizeContentView(android.widget.ScrollView(this).apply { addView(layout) })
         status.text = "Walk or drive around the outside edge of your field, then return to the starting point. GPS should be enabled outdoors."
     }
 

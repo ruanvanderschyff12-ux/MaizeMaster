@@ -1,14 +1,21 @@
 package com.maizemaster.app
 
+import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.view.View
+import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 
 internal object MaizeUi {
     val forest = Color.rgb(17, 61, 43)
@@ -72,4 +79,27 @@ internal object MaizeUi {
         ))
         button.isAllCaps = false
     }
+}
+
+@Suppress("DEPRECATION")
+internal fun Activity.setMaizeContentView(content: View) {
+    WindowCompat.setDecorFitsSystemWindows(window, false)
+    window.statusBarColor = Color.TRANSPARENT
+    window.navigationBarColor = Color.TRANSPARENT
+    window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+    val frame = FrameLayout(this).apply {
+        setBackgroundColor(MaizeUi.forest)
+        if (content.background == null) content.setBackgroundColor(MaizeUi.page)
+        addView(content, FrameLayout.LayoutParams(-1, -1))
+    }
+    ViewCompat.setOnApplyWindowInsetsListener(frame) { view, insets ->
+        val safeArea = insets.getInsets(
+            WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout() or
+                WindowInsetsCompat.Type.ime()
+        )
+        view.setPadding(safeArea.left, safeArea.top, safeArea.right, safeArea.bottom)
+        WindowInsetsCompat.CONSUMED
+    }
+    setContentView(frame)
+    ViewCompat.requestApplyInsets(frame)
 }

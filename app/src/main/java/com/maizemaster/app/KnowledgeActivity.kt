@@ -41,7 +41,7 @@ class KnowledgeActivity : Activity() {
                 })
             }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = MaizeUi.dp(this@KnowledgeActivity, 10) })
         }
-        setContentView(ScrollView(this).apply {
+        setMaizeContentView(ScrollView(this).apply {
             setBackgroundColor(MaizeUi.page)
             addView(content)
         })

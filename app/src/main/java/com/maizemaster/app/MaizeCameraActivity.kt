@@ -153,7 +153,7 @@ class MaizeCameraActivity : Activity() {
         })
         val pageScroll = ScrollView(this).apply { isFillViewport = true }
         pageScroll.addView(root)
-        setContentView(pageScroll)
+        setMaizeContentView(pageScroll)
     }
 
     private fun addOptionalMeasurements(root: LinearLayout): () -> Unit {

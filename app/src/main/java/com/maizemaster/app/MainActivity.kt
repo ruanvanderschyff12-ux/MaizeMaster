@@ -201,8 +201,6 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         storage = FieldStorage(this)
-        window.statusBarColor = forest
-        window.navigationBarColor = forest
 
         val scroll = ScrollView(this).apply {
             setBackgroundColor(page)
@@ -214,7 +212,7 @@ class MainActivity : Activity() {
         }
 
         scroll.addView(layout)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
 
         // Full-width, square-cornered banner.
         val header = ImageView(this).apply {

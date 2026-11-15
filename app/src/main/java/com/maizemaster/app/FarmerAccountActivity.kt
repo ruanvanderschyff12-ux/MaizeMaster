@@ -21,7 +21,7 @@ class FarmerAccountActivity : Activity() {
         }
         val scroll = ScrollView(this)
         scroll.addView(layout)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
         status = TextView(this).apply { textSize = 17f }
         layout.addView(MaizeUi.header(this, "ACCOUNT & SYNC", "Farmer Account",
             "Sign in and sync saved field edits across your phones."))

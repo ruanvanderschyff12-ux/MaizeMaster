@@ -154,15 +154,13 @@ class HarvestActivity : Activity() {
         gpsLabels.clear()
         gpsFields.clear()
         routeViews.clear()
-        window.statusBarColor = forest
-        window.navigationBarColor = forest
         val scroll = ScrollView(this).apply { setBackgroundColor(Color.rgb(244, 249, 245)) }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(20), dp(16), dp(28))
         }
         scroll.addView(body)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
         body.addView(MaizeUi.header(this, "FIELD OPERATIONS", "GPS Harvesting",
             "Track each pass, record loads and see what is left to harvest."))
         val fields = storage.loadFields()

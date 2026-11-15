@@ -26,7 +26,7 @@ class GrowthFieldDetailActivity : Activity() {
             setPadding(dp(18), dp(20), dp(18), dp(24))
         }
         scroll.addView(content)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
         fun label(value: String, size: Float = 16f) {
             content.addView(TextView(this).apply {
                 text = value

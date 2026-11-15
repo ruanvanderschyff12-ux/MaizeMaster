@@ -154,8 +154,6 @@ class MaizeAiActivity : Activity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = dark
-        window.navigationBarColor = dark
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -259,16 +257,6 @@ class MaizeAiActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(49), dp(46)))
         root.addView(entry)
 
-        // Keep the composer above Samsung/Android keyboards, including edge-to-edge layouts.
-        val baseBottom = dp(12)
-        root.setOnApplyWindowInsetsListener { _, insets ->
-            val keyboard = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
-            val navigation = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
-            val extra = (keyboard - navigation).coerceAtLeast(0)
-            root.setPadding(dp(14), dp(12), dp(14), baseBottom + extra)
-            insets
-        }
-        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        setContentView(root)
+        setMaizeContentView(root)
     }
 }

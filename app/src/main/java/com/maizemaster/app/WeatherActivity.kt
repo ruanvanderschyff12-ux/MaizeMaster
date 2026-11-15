@@ -401,7 +401,7 @@ class WeatherActivity : Activity() {
 
         val scroll = ScrollView(this)
         scroll.addView(root)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
 
         fieldSelector.onItemSelectedListener =
             object : AdapterView.OnItemSelectedListener {

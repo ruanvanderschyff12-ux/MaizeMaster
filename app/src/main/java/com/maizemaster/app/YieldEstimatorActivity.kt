@@ -20,7 +20,7 @@ class YieldEstimatorActivity : Activity() {
         }
         val scroll = ScrollView(this)
         scroll.addView(root)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
         root.addView(MaizeUi.header(this, "HARVEST PLANNING", "Yield Estimator",
             "Select a saved field and enter the expected tonnes per hectare."))
         val fields = storage.loadFields()
