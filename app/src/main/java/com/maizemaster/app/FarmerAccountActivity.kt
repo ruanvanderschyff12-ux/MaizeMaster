@@ -89,7 +89,7 @@ class FarmerAccountActivity : Activity() {
             }
         })
         layout.addView(TextView(this).apply {
-            text = "Automatic sync shares this phone’s saved fields with the signed-in account. It runs when you return to Home and every minute while Home stays open."
+            text = "The first account that syncs becomes linked to this phone’s saved fields. It runs when you return to Home and every minute while Home stays open."
         })
         automaticSync = Switch(this).apply {
             text = "Automatically sync fields on Home"
@@ -126,7 +126,7 @@ class FarmerAccountActivity : Activity() {
             }
         })
         layout.addView(TextView(this).apply {
-            text = "Use Sync fields now any time you want to sync immediately. Offline edits stay on your phone until the next online sync. Conflicting edits are kept as copies. Field deletions are local."
+            text = "Use Sync fields now any time you want to sync immediately. Offline edits stay on your phone until the next online sync. Conflicting edits are kept as copies. New deletions of linked fields sync across phones. Update all phones before using synced deletions."
         })
         refresh()
     }

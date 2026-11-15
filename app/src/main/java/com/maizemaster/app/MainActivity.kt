@@ -1303,7 +1303,11 @@ class MainActivity : Activity() {
                             AlertDialog.Builder(this@MainActivity)
                                 .setTitle("Delete field?")
                                 .setMessage(
-                                    "Delete ${field.name} and its saved records?"
+                                    if (storage.syncOwner() != null) {
+                                        "Delete ${field.name} from this phone? The deletion will sync to your other updated phones."
+                                    } else {
+                                        "Delete ${field.name} from this phone?"
+                                    }
                                 )
                                 .setPositiveButton(
                                     "Delete"

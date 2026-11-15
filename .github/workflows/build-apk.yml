@@ -67,25 +67,30 @@ jobs:
             test -s "app/src/main/res/mipmap-$density/ic_launcher_round.png"
           done
 
-      - name: Build permanently signed MaizeMaster APK
-        run: gradle assembleDebug --stacktrace
+      - name: Build signed release APK and app bundle
+        run: gradle assembleRelease bundleRelease --stacktrace
 
       - name: Verify APK signing
         shell: bash
         run: |
           set -euo pipefail
-          APK=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)
+          APK=$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)
           test -n "$APK"
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           "$APKSIGNER" verify --verbose "$APK"
+          BUNDLE=$(find app/build/outputs/bundle/release -maxdepth 1 -name '*.aab' -print -quit)
+          test -s "$BUNDLE"
+          jarsigner -verify "$BUNDLE" > "$RUNNER_TEMP/maizemaster-bundle-signing.txt"
+          grep -Fx 'jar verified.' "$RUNNER_TEMP/maizemaster-bundle-signing.txt"
 
       - name: Publish directly downloadable APK
+        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          APK=$(find app/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)
+          APK=$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)
           test -s "$APK"
           cp "$APK" "$RUNNER_TEMP/MaizeMaster.apk"
           TAG="apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
@@ -100,8 +105,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MaizeMaster-APK
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
 
-# Update installation test: preserve permanent signing identity across builds.
+      - name: Upload MaizeMaster Android App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: MaizeMaster-AAB
+          path: app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30
