@@ -19,9 +19,9 @@ import java.net.URL
  * A future secure backend can supply conversational AI without embedding API keys in the APK.
  */
 class MaizeAiActivity : Activity() {
-    private val dark = Color.rgb(12, 78, 49)
+    private val dark = MaizeUi.forest
     private val green = Color.rgb(28, 137, 57)
-    private val pale = Color.rgb(244, 248, 245)
+    private val pale = MaizeUi.page
     private val gold = Color.rgb(245, 189, 59)
     private lateinit var conversation: LinearLayout
     private lateinit var scroll: ScrollView
@@ -154,8 +154,6 @@ class MaizeAiActivity : Activity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = dark
-        window.navigationBarColor = dark
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -259,16 +257,6 @@ class MaizeAiActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(49), dp(46)))
         root.addView(entry)
 
-        // Keep the composer above Samsung/Android keyboards, including edge-to-edge layouts.
-        val baseBottom = dp(12)
-        root.setOnApplyWindowInsetsListener { _, insets ->
-            val keyboard = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom
-            val navigation = insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
-            val extra = (keyboard - navigation).coerceAtLeast(0)
-            root.setPadding(dp(14), dp(12), dp(14), baseBottom + extra)
-            insets
-        }
-        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        setContentView(root)
+        setMaizeContentView(root)
     }
 }

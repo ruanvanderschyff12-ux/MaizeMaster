@@ -201,8 +201,6 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         storage = FieldStorage(this)
-        window.statusBarColor = forest
-        window.navigationBarColor = forest
 
         val scroll = ScrollView(this).apply {
             setBackgroundColor(page)
@@ -214,7 +212,7 @@ class MainActivity : Activity() {
         }
 
         scroll.addView(layout)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
 
         // Full-width, square-cornered banner.
         val header = ImageView(this).apply {
@@ -241,7 +239,8 @@ class MainActivity : Activity() {
         val pages = listOf(homePage, designerPage, plantingPage, estimatePage, fieldsPage)
         val pageNames = listOf("Home", "Field Designer", "Planting Details", "Harvest Estimate", "My Fields")
         val navigation = card()
-        navigation.addView(heading("🌽 MaizeMaster sections"))
+        navigation.addView(MaizeUi.header(this, "FIELD MANAGEMENT", "Manage your fields",
+            "Design fields, record planting details and plan your harvest."))
         val pageSelector = Spinner(this).apply {
             adapter = ArrayAdapter(this@MainActivity,
                 android.R.layout.simple_spinner_dropdown_item, pageNames)
@@ -1302,7 +1301,11 @@ class MainActivity : Activity() {
                             AlertDialog.Builder(this@MainActivity)
                                 .setTitle("Delete field?")
                                 .setMessage(
-                                    "Delete ${field.name} and its saved records?"
+                                    if (storage.syncOwner() != null) {
+                                        "Delete ${field.name} from this phone? The deletion will sync to your other updated phones."
+                                    } else {
+                                        "Delete ${field.name} from this phone?"
+                                    }
                                 )
                                 .setPositiveButton(
                                     "Delete"

@@ -26,7 +26,7 @@ class HarvestGpsService : Service(), LocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                stopTracking()
+                if (fieldId == null || fieldId == intent.getStringExtra(EXTRA_FIELD)) stopTracking()
                 return START_NOT_STICKY
             }
             ACTION_START -> {
@@ -35,6 +35,7 @@ class HarvestGpsService : Service(), LocationListener {
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                if (fieldId == id && manager != null) return START_NOT_STICKY
                 // A new trip must not inherit the previous trip’s GPS position or distance baseline.
                 try { manager?.removeUpdates(this) } catch (_: Exception) {}
                 manager = null
@@ -77,7 +78,11 @@ class HarvestGpsService : Service(), LocationListener {
         }
         try {
             manager = getSystemService(LOCATION_SERVICE) as LocationManager
-            preferences.edit().putString("${id}_gps_error", "Waiting for a location fix. Go outdoors and enable location.").apply()
+            preferences.edit()
+                .remove("${id}_live_position")
+                .remove("${id}_live_position_time")
+                .putString("${id}_gps_error", "Waiting for a location fix. Go outdoors and enable location.")
+                .apply()
             manager?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this)
             if (manager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) manager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 0f, this)
             // Seed the marker immediately when a recent accurate fix exists, even before movement.
@@ -107,15 +112,16 @@ class HarvestGpsService : Service(), LocationListener {
         preferences.edit().remove("${id}_gps_error").putString("${id}_live_position", JSONArray().put(location.latitude).put(location.longitude).toString()).putLong("${id}_live_position_time", System.currentTimeMillis()).apply()
         if (location.accuracy > 40f || location.provider != LocationManager.GPS_PROVIDER) return
         val last = previous
-        previous = location
-        if (last == null) {
-            saveRoutePoint(id, location)
+        val seconds = last?.let { (location.elapsedRealtimeNanos - it.elapsedRealtimeNanos) / 1e9 }
+        if (last == null || seconds == null || seconds > 15) {
+            previous = location
+            saveRoutePoint(id, location, startsSegment = true)
             return
         }
-        val seconds = (location.elapsedRealtimeNanos - last.elapsedRealtimeNanos) / 1e9
-        if (seconds <= 0 || seconds > 15) return
+        if (seconds <= 0) return
         val meters = last.distanceTo(location).toDouble()
-        if (meters < 3.0 || meters > 8.0 * seconds) return
+        if (meters < 3.0 || meters > minOf(35.0, 8.0 * seconds)) return
+        previous = location
         saveRoutePoint(id, location)
         val current = preferences.getFloat("${id}_gps_meters", 0f)
         preferences.edit()
@@ -124,12 +130,15 @@ class HarvestGpsService : Service(), LocationListener {
             .apply()
     }
 
-    private fun saveRoutePoint(id: String, location: Location) {
+    private fun saveRoutePoint(id: String, location: Location, startsSegment: Boolean = false) {
         try {
             val key = "${id}_gps_route"
             val route = JSONArray(preferences.getString(key, "[]"))
             if (route.length() >= 3000) return
-            route.put(JSONArray().put(location.latitude).put(location.longitude))
+            val point = JSONArray().put(location.latitude).put(location.longitude)
+            // The optional third value marks a break in the recorded path.
+            if (startsSegment) point.put(true)
+            route.put(point)
             preferences.edit().putString(key, route.toString()).apply()
         } catch (_: Exception) {
             preferences.edit().putString("${id}_gps_error", "Unable to save GPS route").apply()

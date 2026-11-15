@@ -43,7 +43,7 @@ class LegacyKnowledgeActivity : Activity() {
         val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
-        setContentView(root)
+        setMaizeContentView(root)
         body.addView(info("🌱 PLANTING\nChoose appropriate seed, planting depth and spacing for local conditions."))
         body.addView(info("🌿 GROWTH\nMonitor emergence, soil moisture, weeds and nutrient deficiencies."))
         body.addView(info("🌽 FLOWERING\nHeat and drought stress during tasseling and silking can reduce kernel set."))

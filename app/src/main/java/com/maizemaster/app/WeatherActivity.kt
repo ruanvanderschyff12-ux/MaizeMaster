@@ -124,16 +124,8 @@ class WeatherActivity : Activity() {
             setBackgroundColor(pageBackground)
         }
 
-        root.addView(
-            label("🌽 MaizeMaster", 26f, true, green)
-        )
-
-        root.addView(
-            label(
-                "Smart Weather Dashboard",
-                15f, false, muted
-            )
-        )
+        root.addView(MaizeUi.header(this, "FIELD CONDITIONS", "Weather",
+            "Check the forecast and what it could mean for your maize."))
 
         val fieldCard = card()
 
@@ -409,7 +401,7 @@ class WeatherActivity : Activity() {
 
         val scroll = ScrollView(this)
         scroll.addView(root)
-        setContentView(scroll)
+        setMaizeContentView(scroll)
 
         fieldSelector.onItemSelectedListener =
             object : AdapterView.OnItemSelectedListener {

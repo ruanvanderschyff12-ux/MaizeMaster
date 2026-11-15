@@ -13,14 +13,13 @@ object HarvestOverlapEstimator {
         val lon0 = origin.optDouble(1, Double.NaN)
         if (!lat0.isFinite() || !lon0.isFinite()) return null
         val factor = cos(Math.toRadians(lat0)).coerceAtLeast(0.01)
-        fun points(data: JSONArray): List<Pair<Double, Double>> = (0 until data.length()).mapNotNull { i ->
-            val p = data.optJSONArray(i) ?: return@mapNotNull null
+        fun project(p: JSONArray): Pair<Double, Double>? {
             val lat = p.optDouble(0, Double.NaN)
             val lon = p.optDouble(1, Double.NaN)
-            if (!lat.isFinite() || !lon.isFinite()) null
+            return if (!lat.isFinite() || !lon.isFinite()) null
             else Pair((lon - lon0) * 111320.0 * factor, (lat - lat0) * 111320.0)
         }
-        val outline = points(boundary)
+        val outline = (0 until boundary.length()).mapNotNull { boundary.optJSONArray(it)?.let(::project) }
         fun inside(x: Double, y: Double): Boolean {
             if (outline.size < 3) return true
             var result = false
@@ -35,12 +34,15 @@ object HarvestOverlapEstimator {
         fun key(x: Int, y: Int) = (x.toLong() shl 32) xor (y.toLong() and 0xffffffffL)
         val used = HashSet<Long>()
         fun cover(data: JSONArray, cuttingWidth: Double) {
-            val pts = points(data)
+            var previous: Pair<Double, Double>? = null
             val radius = cuttingWidth / 2.0
             val reach = ceil(radius / CELL).toInt() + 1
-            for (i in 1 until pts.size) {
-                val a = pts[i - 1]
-                val b = pts[i]
+            for (i in 0 until data.length()) {
+                val point = data.optJSONArray(i)
+                val b = point?.let(::project)
+                val a = previous
+                previous = b
+                if (point == null || a == null || b == null || point.optBoolean(2)) continue
                 val distance = hypot(b.first - a.first, b.second - a.second)
                 if (distance < 0.01 || distance > 35.0) continue
                 val steps = ceil(distance / CELL).toInt().coerceAtLeast(1)

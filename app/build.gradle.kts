@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.maizemaster.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.maizemaster.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "1"}"
     }
